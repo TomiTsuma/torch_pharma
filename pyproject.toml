@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch-pharma"
+version = "0.1.0"
+description = "Deep Learning for Pharmaceutical Discovery and Optimization with PyTorch"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["deep learning", "drug discovery", "molecules", "pytorch", "reinforcement learning"]
+authors = [
+    {name = "Tomi Tsuma", email = "tsuma.thomas@example.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "numpy",
+    "pandas",
+    "rdkit",
+    "pyg-lib",
+    "torch-cluster",
+    "torch-scatter",
+    "torch-sparse",
+    "torch-spline-conv",
+    "torch-geometric",
+    "tqdm",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+    "mkdocs",
+    "mkdocs-material",
+]
+
+[project.scripts]
+torch-pharma = "torch_pharma.cli.train:main"
