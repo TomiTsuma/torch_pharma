@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 license = {file = "LICENSE"}
 keywords = ["deep learning", "drug discovery", "molecules", "pytorch", "reinforcement learning"]
 authors = [
-    {name = "Tomi Tsuma", email = "tsuma.thomas@example.com"}
+    {name = "Tomi Tsuma", email = "tommytsuma7@gmail.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

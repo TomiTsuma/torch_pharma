@@ -16,3 +16,4 @@ isort
 flake8
 mkdocs
 mkdocs-material
+gdown
