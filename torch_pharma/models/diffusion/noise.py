@@ -1,10 +1,9 @@
 import numpy as np
-
-import torch
 from torch import nn
+import torch
+import math
 from torch.nn import functional as F
-from torch_pharma.features import ScalarVector
-from typing import Union
+
 
 # --- NOISE SCHEDULE ---
 
