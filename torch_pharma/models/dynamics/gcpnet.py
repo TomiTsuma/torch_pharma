@@ -3,12 +3,19 @@ from torch import nn
 import numpy as np
 from torch_scatter import scatter
 from torch_geometric.data import Batch
-from torch_pharma.features import safe_norm, get_nonlinearity, ScalarVector
 from typing import Tuple, Optional, Union, Any, List
 from torchtyping import patch_typeguard, TensorType
 from typeguard import typechecked
-from torch_pharma.features import is_identity, vectorize, scalarize, localize
-from torch_pharma.features import ScalarVector, centralize
+from torch_pharma.features import (
+    ScalarVector, 
+    centralize, 
+    localize, 
+    scalarize, 
+    vectorize, 
+    safe_norm, 
+    is_identity, 
+    get_nonlinearity
+)
 from omegaconf import OmegaConf, DictConfig
 from copy import copy
 from functools import partial

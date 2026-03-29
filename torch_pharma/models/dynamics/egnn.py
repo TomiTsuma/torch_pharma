@@ -23,7 +23,7 @@ patch_typeguard()
 
 # --- DYNAMICS COMPONENTS ---
 
-class EGNN_Sparse(nn.Module):
+class EGNN_Simple(nn.Module):
     def __init__(self, feats_dim, pos_dim=3, m_dim=16, edge_attr_dim=0, coors_tanh=True):
         super().__init__()
         self.edge_mlp = nn.Sequential(nn.Linear(feats_dim * 2 + edge_attr_dim + 1, m_dim), nn.SiLU(), nn.Linear(m_dim, m_dim), nn.SiLU())
@@ -404,32 +404,24 @@ class EGNN_Sparse_Network(nn.Module):
 class EGNNDynamics(nn.Module):
     def __init__(
         self,
-        # model_cfg: DictConfig,
-        # module_cfg: DictConfig,
-        # diffusion_cfg: DictConfig,
-        # dataloader_cfg: DictConfig,
-        num_atom_types: int,
-        include_charges: bool,
-        diffusion_target: str, # = "atom_types_and_coords",
-        h_input_dim: int,
-        h_hidden_dim: int, # = 256
-        condition_on_time: bool,
-        conditioning: List[str], # = [alpha]
-        self_condition: bool,
-        e_input_dim: int, # = 1
-        e_hidden_dim: int, # = 64
-
-        chi_input_dim: int, # = 2
-        chi_hidden_dim: int, # = 32
-        xi_input_dim: int, # = 1
-        xi_hidden_dim: int, # = 16
-
-        num_x_dims: int, # = 3
-        norm_x_diff: bool, # = True
-        num_radials: int, # = 1
-
-        num_encoder_layers: int, # = 9
-
+        num_atom_types: int = 16,
+        include_charges: bool = False,
+        diffusion_target: str = "atom_types_and_coords",
+        h_input_dim: int = 16,
+        h_hidden_dim: int = 256,
+        condition_on_time: bool = True,
+        conditioning: List[str] = [],
+        self_condition: bool = True,
+        e_input_dim: int = 1,
+        e_hidden_dim: int = 64,
+        chi_input_dim: int = 2,
+        chi_hidden_dim: int = 32,
+        xi_input_dim: int = 1,
+        xi_hidden_dim: int = 16,
+        num_x_dims: int = 3,
+        norm_x_diff: bool = True,
+        num_radials: int = 1,
+        num_encoder_layers: int = 9,
         **kwargs
     ):
         super().__init__()
