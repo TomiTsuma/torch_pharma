@@ -28,6 +28,18 @@ markdown_extensions:
         python:
           setup_commands:
             - import sys
+            - from unittest.mock import MagicMock
+            - sys.modules["torch"] = MagicMock()
+            - sys.modules["torch.nn"] = MagicMock()
+            - sys.modules["torch.utils"] = MagicMock()
+            - sys.modules["torch_geometric"] = MagicMock()
+            - sys.modules["pyg_lib"] = MagicMock()
+            - sys.modules["torch_scatter"] = MagicMock()
+            - sys.modules["torch_sparse"] = MagicMock()
+            - sys.modules["torch_cluster"] = MagicMock()
+            - sys.modules["torch_spline_conv"] = MagicMock()
+            - sys.modules["rdkit"] = MagicMock()
+            - sys.modules["rdkit.Chem"] = MagicMock()
             - sys.path.append(".")
 
 nav:
