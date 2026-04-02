@@ -271,6 +271,6 @@ This project is licensed under the MIT License.
 
 ## Vision
 
-Torch Pharma aims to provide a unified framework for AI-driven drug discovery, enabling researchers and engineers to build, evaluate, and deploy molecular machine learning models efficiently.
+Torch Pharma aims to provide a unified framework for AI-driven drug discovery, enabling researchers and engineers to build, evaluate, and deploy molecular deep learning models efficiently.
 
 ---
