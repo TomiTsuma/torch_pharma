@@ -8,8 +8,6 @@ build:
 python:
   install:
     - requirements: requirements.docs.txt
-    - method: pip
-      path: .
 
 mkdocs:
   configuration: mkdocs.yml
