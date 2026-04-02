@@ -380,6 +380,8 @@ class CategoricalDistribution:
         return -np.sum(self.p * np.log(q / self.p + self.EPS))
 
 
+
+
 class Queue():
     """
     Adapted from: https://github.com/arneschneuing/DiffSBDD

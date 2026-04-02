@@ -12,10 +12,10 @@ from typeguard import typechecked
 
 patch_typeguard()
 
-from src.utils.pylogger import get_pylogger
+from torch_pharma.utils.logging import get_pylogger
 log = get_pylogger(__name__)
 
-from src.datamodules.components.edm import get_bond_order
+
 from torch_pharma.utils.io import load_files_with_ext, load_molecule_xyz
 
 @typechecked
@@ -161,6 +161,7 @@ def plot_molecule(
 
             s = (atom_types[i], atom_types[j])
 
+            from torch_pharma.data.components.edm import get_bond_order
             draw_edge_int = get_bond_order(
                 dataset_info["atom_decoder"][s[0]],
                 dataset_info["atom_decoder"][s[1]],
@@ -246,4 +247,97 @@ def plot_data3d(
             imageio.imsave(save_path, img_brighter)
     else:
         plt.show()
+
+@typechecked
+def parse_ms_value(ms: Any) -> Tuple[float, float]:
+    """Parse the MS value and its error, return as a tuple."""
+    if isinstance(ms, (float, int)) or ms == "N/A":
+        return (float(ms) if ms != "N/A" else np.nan, 0.0)
+    if not isinstance(ms, str):
+        return (float(ms), 0.0)
+    ms_parts = ms.split("±")
+    value = float(ms_parts[0].strip())
+    error = float(ms_parts[1].strip()) if len(ms_parts) > 1 else 0.0
+    return (value, error)
+
+
+@typechecked
+def format_ms_annotation(value: Any, error: float) -> str:
+    """Format the MS annotation based on value and error."""
+    if value == "N/A" or np.isnan(value):
+        return "N/A"
+    lower = value - error
+    upper = value + error
+    return r"$MS \in " + f"[{lower:.1f}\%, {upper:.1f}\%]" + "$"
+
+
+@typechecked
+def plot_property_optimization(
+    data: Dict[str, Any],
+    save_path: str = "property_optimization_results.png",
+    title: str = "Property Optimization Results"
+):
+    """
+    Plot property optimization results (MAE and Molecule Stability).
+    Adapted from bio-diffusion's optimization_analysis.py.
+    """
+    data_groups = {}
+    for k, v in data.items():
+        values, errors, ms_values = {}, {}, {}
+        for prop in v:
+            raw_value_str = v[prop]["value"].split("±")[0].strip()
+            raw_value = float(raw_value_str)
+            ms_value, ms_error = parse_ms_value(v[prop]["MS"])
+            
+            # Filtering heuristic from original code
+            if raw_value > 50:
+                values[prop], errors[prop], ms_values[prop] = np.nan, 0.0, ("N/A", "N/A")
+            else:
+                values[prop] = raw_value
+                errors[prop] = float(v[prop]["value"].split("±")[1].strip())
+                ms_values[prop] = (ms_value, ms_error)
+        data_groups[k] = {"values": values, "errors": errors, "MS": ms_values}
+
+    x_labels = list(next(iter(data_groups.values()))["values"].keys())
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    width = 0.15
+    group_gap = 0.5
+    n_groups = len(data_groups)
+    total_width = n_groups * width + (n_groups - 1) * group_gap
+    positions = np.arange(len(x_labels)) * (total_width + group_gap)
+
+    for i, (group, group_data) in enumerate(data_groups.items()):
+        vals = list(group_data["values"].values())
+        errs = list(group_data["errors"].values())
+        ms_vals = list(group_data["MS"].values())
+        bar_positions = [pos + i * (width + group_gap) for pos in positions]
+        bars = ax.barh(bar_positions, vals, width, label=group, xerr=errs, capsize=2, alpha=0.8, edgecolor="black")
+
+        for j, val in enumerate(vals):
+            if np.isnan(val):
+                ax.text(0, bar_positions[j], "x", color="red", va="center", ha="center", fontsize=12, weight="bold")
+
+        for bar, (ms, error) in zip(bars, ms_vals):
+            if not isinstance(ms, str) or ms != "N/A":
+                ms_annotation = format_ms_annotation(ms, error)
+                ax.annotate(ms_annotation, (bar.get_width(), bar.get_y() + bar.get_height() / 2 + 0.35),
+                            textcoords="offset points", xytext=(5, 0), ha="left",
+                            fontsize=8, color="darkblue", weight="black")
+
+    ax.set_ylabel("Task")
+    ax.set_xlabel("Property MAE / Molecule Stability (MS) %")
+    ax.set_yticks([pos + total_width / 2 - width / 2 for pos in positions])
+    ax.set_yticklabels(x_labels, rotation=45, va="center")
+    ax.set_title(title)
+    ax.grid(True, which='both', axis='x', linestyle='-.', linewidth=0.5)
+
+    for pos in positions[1:]:
+        ax.axhline(y=pos - group_gap / 2, color="black", linewidth=2)
+
+    ax.legend(loc="best")
+    ax.invert_yaxis()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
     plt.close()
+    log.info(f"Property optimization plot saved to {save_path}")

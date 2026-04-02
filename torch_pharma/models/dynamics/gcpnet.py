@@ -493,7 +493,6 @@ class GCPEmbedding(nn.Module):
         node_hidden_dims: ScalarVector,
         num_atom_types: int,
         nonlinearities: Tuple[Optional[str]] = ("silu", "silu"),
-        # cfg: DictConfig = None,
         pre_norm: bool = True,
         use_gcp_norm: bool = True,
         selected_GCP = GCP2,
@@ -606,16 +605,8 @@ class GCPEmbedding(nn.Module):
         return node_rep, edge_rep
 
 
-def get_GCP_with_custom_cfg(input_dims, output_dims, cfg: DictConfig, **kwargs):
-    cfg_dict = copy(OmegaConf.to_container(cfg, throw_on_missing=True))
-    cfg_dict["nonlinearities"] = cfg.nonlinearities
-    del cfg_dict["scalar_nonlinearity"]
-    del cfg_dict["vector_nonlinearity"]
-
-    for key in kwargs:
-        cfg_dict[key] = kwargs[key]
-
-    return selected_GCP(input_dims, output_dims, **cfg_dict)
+def get_GCP_with_custom_cfg(input_dims, output_dims, selected_GCP=GCP2, **kwargs):
+    return selected_GCP(input_dims, output_dims, **kwargs)
 
 
 class GCPMessagePassing(nn.Module):
@@ -624,12 +615,21 @@ class GCPMessagePassing(nn.Module):
         input_dims: ScalarVector,
         output_dims: ScalarVector,
         edge_dims: ScalarVector,
-        # cfg: DictConfig,
-        # mp_cfg: DictConfig,
-        
         reduce_function: str = "sum",
         use_scalar_message_attention: bool = True,
         use_residual_message_gcp: bool = True,
+        num_message_layers: int = 4,
+        self_message: bool = True,
+        selected_GCP = GCP2,
+        nonlinearities = ("silu", "silu"),
+        scalar_gate = 0,
+        vector_gate = True,
+        frame_gate = False,
+        sigma_frame_gate = False,
+        vector_frame_residual = False,
+        ablate_frame_updates = False,
+        ablate_scalars = False,
+        ablate_vectors = False
     ):
         super().__init__()
 
@@ -638,7 +638,7 @@ class GCPMessagePassing(nn.Module):
         self.scalar_output_dim, self.vector_output_dim = output_dims
         self.edge_scalar_dim, self.edge_vector_dim = edge_dims
         # self.conv_cfg = mp_cfg
-        self.self_message = self.conv_cfg.self_message
+        self.self_message = self_message
         self.reduce_function = reduce_function
         self.use_residual_message_gcp = use_residual_message_gcp
         self.use_scalar_message_attention = use_scalar_message_attention
@@ -647,26 +647,33 @@ class GCPMessagePassing(nn.Module):
         vectors_in_dim = 2 * self.vector_input_dim + self.edge_vector_dim
 
         # config instantiations
-        # soft_cfg = copy(cfg)
-        # soft_cfg.bottleneck, soft_cfg.vector_residual = cfg.default_bottleneck, cfg.default_vector_residual
-
-        # primary_cfg_GCP = partial(get_GCP_with_custom_cfg, cfg=soft_cfg)
-        # secondary_cfg_GCP = partial(get_GCP_with_custom_cfg, cfg=cfg)
+        gcp_kwargs = {
+            "selected_GCP": selected_GCP,
+            "scalar_gate": scalar_gate,
+            "vector_gate": vector_gate,
+            "frame_gate": frame_gate,
+            "sigma_frame_gate": sigma_frame_gate,
+            "vector_frame_residual": vector_frame_residual,
+            "ablate_frame_updates": ablate_frame_updates,
+            "ablate_scalars": ablate_scalars,
+            "ablate_vectors": ablate_vectors
+        }
 
         # PyTorch modules #
         module_list = [
-            GCP2(
+            get_GCP_with_custom_cfg(
                 (scalars_in_dim, vectors_in_dim),
                 output_dims,
-                nonlinearities=cfg.nonlinearities
+                nonlinearities=nonlinearities,
+                **gcp_kwargs
             )
         ]
 
-        for _ in range(self.conv_cfg.num_message_layers - 2):
-            module_list.append(secondary_cfg_GCP(output_dims, output_dims))
+        for _ in range(num_message_layers - 2):
+            module_list.append(get_GCP_with_custom_cfg(output_dims, output_dims, **gcp_kwargs))
 
-        if self.conv_cfg.num_message_layers > 1:
-            module_list.append(primary_cfg_GCP(output_dims, output_dims, nonlinearities=cfg.nonlinearities))
+        if num_message_layers > 1:
+            module_list.append(get_GCP_with_custom_cfg(output_dims, output_dims, nonlinearities=nonlinearities, **gcp_kwargs))
 
         self.message_fusion = nn.ModuleList(module_list)
 
@@ -748,21 +755,38 @@ class GCPInteractions(nn.Module):
         self,
         node_dims: ScalarVector,
         edge_dims: ScalarVector,
-        cfg: DictConfig,
-        layer_cfg: DictConfig,
         dropout: float = 0.0,
         nonlinearities: Optional[Tuple[Any, Any]] = None,
-        update_node_positions: bool = False
+        update_node_positions: bool = False,
+        pre_norm: bool = False,
+        node_positions_weight: float = 1.0,
+        update_positions_with_vector_sum: bool = False,
+        use_scalar_message_attention: bool = True,
+        use_residual_message_gcp: bool = True,
+        num_message_layers: int = 4,
+        self_message: bool = True,
+        num_feedforward_layers: int = 1,
+        use_gcp_norm: bool = False,
+        use_gcp_dropout: bool = False,
+        selected_GCP = GCP2,
+        scalar_gate = 0,
+        vector_gate = True,
+        frame_gate = False,
+        sigma_frame_gate = False,
+        vector_frame_residual = False,
+        ablate_frame_updates = False,
+        ablate_scalars = False,
+        ablate_vectors = False
     ):
         super().__init__()
 
         # hyperparameters #
         if nonlinearities is None:
-            nonlinearities = cfg.nonlinearities
-        self.pre_norm = layer_cfg.pre_norm
+            nonlinearities = ("silu", "silu")
+        self.pre_norm = pre_norm
         self.update_node_positions = update_node_positions
-        self.node_positions_weight = getattr(cfg, "node_positions_weight", 1.0)
-        self.update_positions_with_vector_sum = getattr(cfg, "update_positions_with_vector_sum", False)
+        self.node_positions_weight = node_positions_weight
+        self.update_positions_with_vector_sum = update_positions_with_vector_sum
         reduce_function = "sum"
 
         # PyTorch modules #
@@ -770,54 +794,62 @@ class GCPInteractions(nn.Module):
         # geometry-complete message-passing neural network
         message_function = GCPMessagePassing
 
+        gcp_kwargs = {
+            "selected_GCP": selected_GCP,
+            "scalar_gate": scalar_gate,
+            "vector_gate": vector_gate,
+            "frame_gate": frame_gate,
+            "sigma_frame_gate": sigma_frame_gate,
+            "vector_frame_residual": vector_frame_residual,
+            "ablate_frame_updates": ablate_frame_updates,
+            "ablate_scalars": ablate_scalars,
+            "ablate_vectors": ablate_vectors
+        }
+
         self.interaction = message_function(
             node_dims,
             node_dims,
             edge_dims,
-            cfg=cfg,
-            mp_cfg=layer_cfg.mp_cfg,
             reduce_function=reduce_function,
-            use_scalar_message_attention=layer_cfg.use_scalar_message_attention
+            use_scalar_message_attention=use_scalar_message_attention,
+            use_residual_message_gcp=use_residual_message_gcp,
+            num_message_layers=num_message_layers,
+            self_message=self_message,
+            nonlinearities=nonlinearities,
+            **gcp_kwargs
         )
 
-        # config instantiations
-        ff_cfg = copy(cfg)
-        ff_cfg.nonlinearities = nonlinearities
-        ff_without_res_cfg = copy(cfg)
-        ff_without_res_cfg.vector_residual = False
-
-        ff_GCP = partial(get_GCP_with_custom_cfg, cfg=ff_cfg)
-        ff_without_res_GCP = partial(get_GCP_with_custom_cfg, cfg=ff_without_res_cfg)
-
-        self.gcp_norm = nn.ModuleList([GCPLayerNorm(node_dims, use_gcp_norm=layer_cfg.use_gcp_norm)])
-        self.gcp_dropout = nn.ModuleList([GCPDropout(dropout, use_gcp_dropout=layer_cfg.use_gcp_dropout)])
+        self.gcp_norm = nn.ModuleList([GCPLayerNorm(node_dims, use_gcp_norm=use_gcp_norm)])
+        self.gcp_dropout = nn.ModuleList([GCPDropout(dropout, use_gcp_dropout=use_gcp_dropout)])
 
         # build out feedforward (FF) network modules
         hidden_dims = (
             (node_dims.scalar, node_dims.vector)
-            if layer_cfg.num_feedforward_layers == 1
+            if num_feedforward_layers == 1
             else (4 * node_dims.scalar, 2 * node_dims.vector)
         )
         ff_interaction_layers = [
-            ff_without_res_GCP(
+            get_GCP_with_custom_cfg(
                 (node_dims.scalar * 2, node_dims.vector * 2), hidden_dims,
-                nonlinearities=(None, None) if layer_cfg.num_feedforward_layers == 1 else cfg.nonlinearities,
-                feedforward_out=layer_cfg.num_feedforward_layers == 1
+                nonlinearities=(None, None) if num_feedforward_layers == 1 else nonlinearities,
+                feedforward_out=num_feedforward_layers == 1,
+                **gcp_kwargs
             )
         ]
 
         interaction_layers = [
-            ff_GCP(hidden_dims, hidden_dims)
-            for _ in range(layer_cfg.num_feedforward_layers - 2)
+            get_GCP_with_custom_cfg(hidden_dims, hidden_dims, **gcp_kwargs)
+            for _ in range(num_feedforward_layers - 2)
         ]
         ff_interaction_layers.extend(interaction_layers)
 
-        if layer_cfg.num_feedforward_layers > 1:
+        if num_feedforward_layers > 1:
             ff_interaction_layers.append(
-                ff_without_res_GCP(
+                get_GCP_with_custom_cfg(
                     hidden_dims, node_dims,
                     nonlinearities=(None, None),
-                    feedforward_out=True
+                    feedforward_out=True,
+                    **gcp_kwargs
                 )
             )
 
@@ -828,12 +860,13 @@ class GCPInteractions(nn.Module):
             # node position update GCP(s)
             position_output_dims = (
                 node_dims
-                if getattr(cfg, "update_positions_with_vector_sum", False)
+                if update_positions_with_vector_sum
                 else (node_dims.scalar, 1)
             )
-            self.node_position_update_gcp = ff_without_res_GCP(
+            self.node_position_update_gcp = get_GCP_with_custom_cfg(
                 node_dims, position_output_dims,
-                nonlinearities=cfg.nonlinearities
+                nonlinearities=nonlinearities,
+                **gcp_kwargs
             )
 
     @typechecked
@@ -940,12 +973,7 @@ class GCPInteractions(nn.Module):
 class GCPNetDynamics(nn.Module):
     def __init__(
         self,
-        # model_cfg: DictConfig,
-        # module_cfg: DictConfig,
-        # layer_cfg: DictConfig,
-        # diffusion_cfg: DictConfig,
-        # dataloader_cfg: DictConfig
-        h_input_dim,
+        h_input_dim: int = 16,
         num_atom_types: int = 5,
         include_charges: bool = True,
         diffusion_target: str = "atom_types_and_coords",
@@ -954,17 +982,17 @@ class GCPNetDynamics(nn.Module):
         self_condition: bool = True,
         e_input_dim: int = 1,
         xi_input_dim: int = 1,
-        chi_input_dim: int = 1,
-        h_hidden_dim: int = 128,
-        e_hidden_dim: int = 128,
-        xi_hidden_dim: int = 128,
-        chi_hidden_dim: int = 128,
-        num_layers: int = 6,
-        num_feedforward_layers: int = 2,
+        chi_input_dim: int = 2,
+        h_hidden_dim: int = 256,
+        e_hidden_dim: int = 64,
+        xi_hidden_dim: int = 16,
+        chi_hidden_dim: int = 32,
+        num_layers: int = 9,
+        num_feedforward_layers: int = 1,
         num_attention_heads: int = 4,
-        dropout_rate: float = 0.1,
-        use_gcp_dropout: bool = True,
-        use_gcp_norm: bool = True,
+        dropout_rate: float = 0.0,
+        use_gcp_dropout: bool = False,
+        use_gcp_norm: bool = False,
         update_node_positions: bool = True,
         update_positions_with_vector_sum: bool = False,
         norm_x_diff: bool = True,
@@ -980,7 +1008,14 @@ class GCPNetDynamics(nn.Module):
         vector_frame_residual: bool = False,
         ablate_frame_updates: bool = False,
         ablate_scalars: bool = False,
-        ablate_vectors: bool = False
+        ablate_vectors: bool = False,
+        nonlinearities: Tuple[Optional[str], Optional[str]] = ("silu", "silu"),
+        pre_norm: bool = False,
+        use_scalar_message_attention: bool = True,
+        use_residual_message_gcp: bool = True,
+        num_message_layers: int = 4,
+        self_message: bool = True,
+        node_positions_weight: float = 1.0,
     ):
         super().__init__()
 
@@ -1042,6 +1077,18 @@ class GCPNetDynamics(nn.Module):
 
         # PyTorch modules #
 
+        gcp_kwargs = {
+            "selected_GCP": selected_GCP,
+            "scalar_gate": scalar_gate,
+            "vector_gate": vector_gate,
+            "frame_gate": frame_gate,
+            "sigma_frame_gate": sigma_frame_gate,
+            "vector_frame_residual": vector_frame_residual,
+            "ablate_frame_updates": ablate_frame_updates,
+            "ablate_scalars": ablate_scalars,
+            "ablate_vectors": ablate_vectors
+        }
+
         # input embeddings
         self.gcp_embedding = GCPEmbedding(
             self.edge_input_dims,
@@ -1049,8 +1096,10 @@ class GCPNetDynamics(nn.Module):
             self.edge_dims,
             self.node_dims,
             num_atom_types=0,  # note: assumes e.g., input atom types are float values
-            cfg=module_cfg,
-            use_gcp_norm=layer_cfg.use_gcp_norm
+            nonlinearities=nonlinearities,
+            pre_norm=pre_norm,
+            use_gcp_norm=use_gcp_norm,
+            **gcp_kwargs
         )
 
         # message-passing (and node position update) layers
@@ -1058,11 +1107,21 @@ class GCPNetDynamics(nn.Module):
             GCPInteractions(
                 self.node_dims,
                 self.edge_dims,
-                cfg=module_cfg,
-                layer_cfg=layer_cfg,
-                dropout=model_cfg.dropout,
-                update_node_positions=True
-            ) for _ in range(model_cfg.num_encoder_layers)
+                dropout=dropout,
+                nonlinearities=nonlinearities,
+                update_node_positions=True,
+                pre_norm=pre_norm,
+                node_positions_weight=node_positions_weight,
+                update_positions_with_vector_sum=update_positions_with_vector_sum,
+                use_scalar_message_attention=use_scalar_message_attention,
+                use_residual_message_gcp=use_residual_message_gcp,
+                num_message_layers=num_message_layers,
+                self_message=self_message,
+                num_feedforward_layers=num_feedforward_layers,
+                use_gcp_norm=use_gcp_norm,
+                use_gcp_dropout=use_gcp_dropout,
+                **gcp_kwargs
+            ) for _ in range(num_encoder_layers)
         )
 
         if diffusion_target in NODE_FEATURE_DIFFUSION_TARGETS:

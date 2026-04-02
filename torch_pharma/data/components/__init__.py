@@ -30,6 +30,6 @@ from torch_pharma.utils.visualize import (
     plot_data3d
 )
 
-from src.utils.pylogger import get_pylogger
+from torch_pharma.utils.logging import get_pylogger
 
 log = get_pylogger(__name__)

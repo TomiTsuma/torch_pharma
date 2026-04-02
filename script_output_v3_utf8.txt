@@ -1,0 +1,77 @@
+﻿SCRIPT STARTING...
+math imported
+os imported
+torch imported
+torchmetrics imported
+numpy imported
+F imported
+nn imported
+rdkit imported
+torch_geometric imported
+torch_scatter imported
+utils imported
+io imported
+geometry imported
+visualize imported
+logging imported
+featurizers imported
+chemistry imported
+datasets utils imported
+edm imported
+egnn imported
+diffusion imported
+gcpnet imported
+transformers imported
+math utils imported
+dataset utils again imported
+typeguard/torchtyping imported
+Initializing model...
+Entropy of n_nodes: H[N] -0.5481089949607849
+python3.11 : Traceback 
+(most recent call 
+last):
+At line:1 char:65
++ ... ch_pharma"; 
+python3.11 c:\Users\tsu
+ma.thomas\Documents\tor
+ch_pharma\e ...
++                 ~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Traceback (mo   
+ st recent call las    
+t)::String) [], Re    
+moteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+  File "c:\Users\tsuma.
+thomas\Documents\torch_
+pharma\examples\molecul
+e_generation\2302_04313
+\qm9_mol_gen_ddpm.py", 
+line 1387, in <module>
+    model.ddpm.num_node
+s_distribution = Catego
+ricalDistribution(
+                       
+                 ^^^^^^
+^^^^^^^^^^^^^^^^^^
+  File "c:\Users\tsuma.
+thomas\Documents\torch_
+pharma\torch_pharma\mod
+els\transformers\__init
+__.py", line 364, in 
+__init__
+    for k, v in 
+histogram_dict.items():
+                
+^^^^^^^^^^^^^^^^^^^^
+AttributeError: 
+'Tensor' object has no 
+attribute 'items'. Did 
+you mean: 'item'?

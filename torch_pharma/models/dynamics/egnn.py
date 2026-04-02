@@ -5,11 +5,10 @@ from torch import nn
 from einops import rearrange
 from torch_scatter import scatter
 from torch_geometric.nn import MessagePassing
-from torchtyping import Tensor, Adj, Size, OptTensor, TensorType
+from torch import Tensor, Size
+from torch_geometric.typing import Adj, OptTensor
 from typing import List, Dict, Any, Tuple, Optional
 from torch_geometric.data import Batch
-from torch_pharma.activation import SiLU
-from torch_pharma.models.dynamics import exists, fourier_encode_dist,embedd_token
 from torch_pharma.models.dynamics.utils import NODE_FEATURE_DIFFUSION_TARGETS
 from torch_pharma.features import ScalarVector, centralize
 from torch_pharma.data.components.edm.edm_dataset import _edge_features, _node_features
@@ -17,6 +16,9 @@ from torch_pharma.models.dynamics.gcpnet import GCPNetDynamics
 
 from typeguard import typechecked
 from torchtyping import TensorType, patch_typeguard
+
+from torch_pharma.modules.activation import SiLU
+from torch_pharma.models.dynamics import exists, fourier_encode_dist, embedd_token
 
 patch_typeguard()
 

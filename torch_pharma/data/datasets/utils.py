@@ -182,12 +182,12 @@ def get_dataset_info(dataset_name: str, remove_h: bool) -> Dict[str, Any]:
 
 
 def download_qm9():
-    os.makedirs(os.path.join(str(TORCH_PHARMA_HOME), "qm9"), exist_ok=True)
-    gdown.download(QM9_ATOMREF_URL, os.path.join(str(TORCH_PHARMA_HOME), "qm9/atomref.txt"), quiet=False)
-    gdown.download(QM9_DATA_URL, os.path.join(str(TORCH_PHARMA_HOME), "qm9/data.tar.bz2"), quiet=False)
-    gdown.download(QM9_UNCHARACTERIZED_URL, os.path.join(str(TORCH_PHARMA_HOME), "qm9/uncharacterized.txt"), quiet=False)
+    os.makedirs(os.path.join(str(TORCH_PHARMA_HOME), "QM9"), exist_ok=True)
+    gdown.download(QM9_ATOMREF_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/atomref.txt"), quiet=False)
+    gdown.download(QM9_DATA_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/data.tar.bz2"), quiet=False)
+    gdown.download(QM9_UNCHARACTERIZED_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/uncharacterized.txt"), quiet=False)
 
-    return os.path.join(str(TORCH_PHARMA_HOME), "qm9")
+    return os.path.join(str(TORCH_PHARMA_HOME), "QM9")
 
 
 def process_xyz_files(data, process_file_fn, file_ext=None, file_idx_list=None, stack=True):

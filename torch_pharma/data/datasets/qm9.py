@@ -20,6 +20,7 @@ from typeguard import typechecked
 from torch_pharma.data.datasets.utils import download_qm9, TORCH_PHARMA_HOME, process_xyz_files, process_xyz_gdb9, get_dataset_info
 from torch_pharma.data.datasets.base import BaseDataset
 from torch_pharma.molecules.chemistry import mol2smiles, build_molecule, process_molecule
+from torch_pharma.data.components.edm import retrieve_dataloaders, get_bond_order_batch, get_bond_length_arrays
 
 
 patch_typeguard()  # use before @typechecked
@@ -45,8 +46,14 @@ def cleanup_file(file, cleanup=True):
 class QM9Dataset(BaseDataset):
     def __init__(self, calculate_thermo=True):
         super().__init__()
-        self.gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "qm9")
+        self.gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "QM9")
+        self.dataset = "QM9"
         self.calculate_thermo = calculate_thermo
+        if "atomref.txt" not in os.listdir(self.gdb9_dir) or "uncharacterized.txt" not in os.listdir(self.gdb9_dir) or "data.tar.bz2" not in os.listdir(self.gdb9_dir):
+            self.download()
+        else:
+            self.process()
+        self.mols_smiles = self.compute_smiles(self, remove_h=False)
 
     def download(self):
         download_qm9()
@@ -200,8 +207,7 @@ class QM9Dataset(BaseDataset):
         return charge_counts
 
     def process(self):
-        self.download()
-        gdb9_tar_data = os.path.join(self.gdb9_dir, "dsgdb9nsd.xyz.tar.bz2")
+        gdb9_tar_data = os.path.join(self.gdb9_dir, "data.tar.bz2")
         splits = self.gen_splits_gdb9()
 
         #Process GDB9 dataset and return a dictionary of splits
@@ -224,7 +230,7 @@ class QM9Dataset(BaseDataset):
             savedir = os.path.join(self.gdb9_dir, split+".npz")
             np.savez_compressed(savedir, **data)
 
-    def compute_smiles(self, dataset, remove_h):
+    def compute_smiles(self,  remove_h):
         class StaticArgs:
             def __init__(self, dataset, remove_h):
                 self.dataset = dataset
@@ -244,8 +250,8 @@ class QM9Dataset(BaseDataset):
                 self.num_test = -1
                 self.shuffle = True
                 self.drop_last = True
-        args_dataset = StaticArgs(dataset, remove_h)
-        dataloaders, _ = dataset.retrieve_loaders(args_dataset)
+        args_dataset = StaticArgs(self.dataset, remove_h)
+        dataloaders, _ = retrieve_dataloaders(args_dataset)
         dataset_info = get_dataset_info(args_dataset.dataset, args_dataset.remove_h)
         n_types = 4 if remove_h else 5
         mols_smiles = []
@@ -266,4 +272,8 @@ class QM9Dataset(BaseDataset):
         return mols_smiles
 
 
+    def __len__(self):
+        return len(self.mols_smiles)
 
+    def __getitem__(self, idx):
+        return self.mols_smiles[idx]

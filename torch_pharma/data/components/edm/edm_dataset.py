@@ -3,19 +3,37 @@
 # -------------------------------------------------------------------------------------------------------------------------------------
 
 import torch
+import os
+import numpy as np
 import logging
 import torch_geometric
 
 from typing import Any, Dict, Optional, Tuple, Union
 from torch_geometric.data import Data, Dataset, Batch
 
+from omegaconf import DictConfig
+from functools import partial
+from torch.utils.data import DataLoader as TorchDataLoader
+from torch_geometric.loader import DataLoader as PyGDataLoader
+
 from torch_pharma.data.components.edm.helper import _normalize
 from torch_pharma.data.components.edm.protein_graph_dataset import ProteinGraphDataset
+from torch_pharma.data.components.edm.collate import PreprocessQM9
+from torch_pharma.utils.logging import get_pylogger
 
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 
 patch_typeguard()  # use before @typechecked
+
+log = get_pylogger(__name__)
+
+SHARING_STRATEGY = "file_system"
+torch.multiprocessing.set_sharing_strategy(SHARING_STRATEGY)
+
+
+def set_worker_sharing_strategy(worker_id: int):
+    torch.multiprocessing.set_sharing_strategy(SHARING_STRATEGY)
 
 
 @typechecked
@@ -184,7 +202,7 @@ class ProcessedDataset(Dataset):
     @typechecked
     def _featurize_as_graph(self, molecule: Dict[str, Any], dtype: torch.dtype = torch.float32) -> Data:
         with torch.no_grad():
-            index = molecule["index"].unsqueeze(-1)
+            mol_index = molecule["index"].unsqueeze(-1)
             coords = molecule["positions"].type(dtype)
 
             mask = molecule["charges"] > 0
@@ -207,7 +225,7 @@ class ProcessedDataset(Dataset):
                 one_hot=one_hot,
                 charges=charges,
                 x=coords,
-                index=index,
+                mol_index=mol_index,
                 edge_index=edge_index,
                 mask=mask,
                 **conditional_properties
@@ -221,3 +239,185 @@ class ProcessedDataset(Dataset):
             idx = self.perm[idx]
         item = {key: val[idx] for key, val in self.data.items()}
         return self._featurize_as_graph(item) if self.create_pyg_graphs else item
+
+
+def initialize_datasets(args, data_dir, dataset, subset=None, splits=None,
+                        force_download=False, subtract_thermo=False,
+                        remove_h=False, create_pyg_graphs=False,
+                        num_radials=1, device="cpu"):
+    """
+    Initialize datasets from .npz files.
+    """
+    from torch_pharma.data.datasets.utils import TORCH_PHARMA_HOME
+    from torch_pharma.data.datasets.qm9 import QM9Dataset
+
+    # Set the number of points based upon the arguments
+    num_pts = {"train": getattr(args, "num_train", -1), 
+               "test": getattr(args, "num_test", -1), 
+               "valid": getattr(args, "num_valid", -1)}
+
+    gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "QM9")
+    
+    # Check if files exist, otherwise process
+    splits_to_check = ["train", "valid", "test"]
+    files_exist = all(os.path.exists(os.path.join(gdb9_dir, f"{split}.npz")) for split in splits_to_check)
+    
+    if not files_exist or force_download:
+        log.info("Processing QM9 dataset...")
+        qm9 = QM9Dataset()
+        qm9.process()
+
+    # Load datasets
+    datasets = {}
+    for split in splits_to_check:
+        datafile = os.path.join(gdb9_dir, f"{split}.npz")
+        with np.load(datafile) as f:
+            datasets[split] = {key: torch.from_numpy(val) for key, val in f.items()}
+
+    # Handle dataset halves if specified
+    if dataset != "QM9":
+        np.random.seed(42)
+        fixed_perm = np.random.permutation(len(datasets["train"]["num_atoms"]))
+        if dataset == "QM9_second_half":
+            sliced_perm = fixed_perm[len(datasets["train"]["num_atoms"])//2:]
+        elif dataset == "QM9_first_half":
+            sliced_perm = fixed_perm[0:len(datasets["train"]["num_atoms"]) // 2]
+        else:
+            raise Exception(f"Unknown dataset name: {dataset}")
+        for key in datasets["train"]:
+            datasets["train"][key] = datasets["train"][key][sliced_perm]
+
+    # Remove hydrogens if specified
+    if remove_h:
+        for key, split_data in datasets.items():
+            pos = split_data["positions"]
+            charges = split_data["charges"]
+            num_atoms = split_data["num_atoms"]
+
+            assert torch.sum(num_atoms != torch.sum(charges > 0, dim=1)) == 0
+
+            mask = charges > 1
+            new_positions = torch.zeros_like(pos)
+            new_charges = torch.zeros_like(charges)
+            for i in range(new_positions.shape[0]):
+                m = mask[i]
+                p = pos[i][m]
+                if p.shape[0] > 0:
+                    p = p - torch.mean(p, dim=0)
+                c = charges[i][m]
+                n = torch.sum(m)
+                new_positions[i, :n, :] = p
+                new_charges[i, :n] = c
+
+            split_data["positions"] = new_positions
+            split_data["charges"] = new_charges
+            split_data["num_atoms"] = torch.sum(split_data["charges"] > 0, dim=1)
+
+    all_species = _get_species(datasets)
+
+    datasets = {
+        split: ProcessedDataset(data,
+                                num_pts=num_pts.get(split, -1),
+                                included_species=all_species,
+                                subtract_thermo=subtract_thermo,
+                                create_pyg_graphs=create_pyg_graphs,
+                                num_radials=num_radials,
+                                device=device)
+        for split, data in datasets.items()
+    }
+
+    num_species = datasets["train"].num_species
+    max_charge = datasets["train"].max_charge
+
+    # Update args if it's an object we can modify
+    if hasattr(args, "num_train"): args.num_train = datasets["train"].num_pts
+    if hasattr(args, "num_valid"): args.num_valid = datasets["valid"].num_pts
+    if hasattr(args, "num_test"): args.num_test = datasets["test"].num_pts
+
+    return args, datasets, num_species, max_charge
+
+
+def _get_species(datasets, ignore_check=False):
+    all_species = torch.cat([data["charges"].unique()
+                             for data in datasets.values()]).unique(sorted=True)
+
+    split_species = {split: data["charges"].unique(sorted=True) 
+                     for split, data in datasets.items()}
+
+    if all_species[0] == 0:
+        all_species = all_species[1:]
+
+    split_species = {split: species[1:] if species[0] == 0 else species 
+                     for split, species in split_species.items()}
+
+    if not all([split.tolist() == all_species.tolist() for split in split_species.values()]):
+        if ignore_check:
+            log.error("The number of species is not the same in all datasets!")
+        else:
+            raise ValueError("Not all datasets have the same number of species!")
+
+    return all_species
+
+
+def retrieve_dataloaders(dataloader_cfg: DictConfig):
+    if "QM9" in dataloader_cfg.dataset:
+        batch_size = dataloader_cfg.batch_size
+        num_workers = dataloader_cfg.num_workers
+        filter_n_atoms = dataloader_cfg.filter_n_atoms
+        
+        cfg_, datasets, _, charge_scale = initialize_datasets(
+            dataloader_cfg,
+            dataloader_cfg.data_dir,
+            dataloader_cfg.dataset,
+            subtract_thermo=dataloader_cfg.subtract_thermo,
+            force_download=dataloader_cfg.force_download,
+            remove_h=dataloader_cfg.remove_h,
+            create_pyg_graphs=dataloader_cfg.create_pyg_graphs,
+            num_radials=dataloader_cfg.num_radials,
+            device=dataloader_cfg.device
+        )
+        
+        qm9_to_eV = {
+            "U0": 27.2114, "U": 27.2114, "G": 27.2114, "H": 27.2114,
+            "zpve": 27211.4, "gap": 27.2114, "homo": 27.2114, "lumo": 27.2114
+        }
+
+        for dataset in datasets.values():
+            dataset.convert_units(qm9_to_eV)
+
+        if filter_n_atoms is not None:
+            log.info(f"Retrieving molecules with only {filter_n_atoms} atoms")
+            datasets = filter_atoms(datasets, filter_n_atoms)
+
+        preprocess = PreprocessQM9(load_charges=dataloader_cfg.include_charges)
+        prefetch = 100 if num_workers > 0 else None
+        dataloader_class = (
+            partial(PyGDataLoader, prefetch_factor=prefetch, worker_init_fn=set_worker_sharing_strategy)
+            if dataloader_cfg.create_pyg_graphs
+            else partial(TorchDataLoader, collate_fn=preprocess.collate_fn)
+        )
+        
+        dataloaders = {
+            split: dataloader_class(dataset,
+                                   num_workers=num_workers,
+                                   batch_size=batch_size,
+                                   shuffle=(split == "train"),
+                                   drop_last=(split == "train"))
+            for split, dataset in datasets.items()
+        }
+    else:
+        raise ValueError(f"Unknown dataset {dataloader_cfg.dataset}")
+
+    return dataloaders, charge_scale
+
+
+def filter_atoms(datasets, n_nodes):
+    for key in datasets:
+        dataset = datasets[key]
+        idxs = dataset.data["num_atoms"] == n_nodes
+        for key2 in dataset.data:
+            dataset.data[key2] = dataset.data[key2][idxs]
+
+        datasets[key].num_pts = dataset.data["one_hot"].size(0)
+        datasets[key].perm = None
+    return datasets

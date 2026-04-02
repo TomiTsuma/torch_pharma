@@ -247,7 +247,7 @@ If you use Torch Pharma in your research, please cite:
 ```bibtex
 @software{torchpharma2026,
   title={Torch Pharma: A PyTorch Framework for Drug Discovery},
-  author={Your Name},
+  author={Thomas Tsuma},
   year={2026}
 }
 ```

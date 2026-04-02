@@ -59,7 +59,7 @@ def write_xyz_file(
 
 @typechecked
 def write_sdf_file(sdf_path: Path, molecules: List[Chem.Mol], verbose: bool = True):
-    from src.utils.pylogger import get_pylogger
+    from torch_pharma.utils.logging import get_pylogger
     log = get_pylogger(__name__)
     
     w = Chem.SDWriter(str(sdf_path))
