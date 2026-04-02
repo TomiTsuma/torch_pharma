@@ -26,7 +26,6 @@ dependencies = [
     "numpy",
     "pandas",
     "rdkit",
-    "pyg-lib",
     "torch-cluster",
     "torch-scatter",
     "torch-sparse",

@@ -2,7 +2,6 @@ torch>=2.0.0
 numpy
 pandas
 rdkit
-pyg-lib
 torch-cluster
 torch-scatter
 torch-sparse
