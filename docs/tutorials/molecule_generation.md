@@ -1,6 +1,6 @@
 # Molecule Generation Tutorial
 
-Generate novel molecules using diffusion models.
+Generate novel 3D molecules using diffusion models.
 
 ---
 
@@ -8,18 +8,42 @@ Generate novel molecules using diffusion models.
 
 In this tutorial, you'll learn to:
 
-1. Load molecular data for training
-2. Build a diffusion model (EDM)
-3. Train the model to generate 3D molecular structures
-4. Sample and evaluate new molecules
+1. Set up a Geometry-Complete Diffusion Model (GCDM)
+2. Train on the QM9 dataset for 3D molecular generation
+3. Sample and evaluate new molecules with 3D structures
+4. Use conditional generation for property optimization
 
-**Time to complete:** ~30 minutes
+**Time to complete:** ~45 minutes
 
 ---
 
 ## Background
 
-Diffusion models generate data by learning to reverse a gradual noising process. In molecular generation, this allows creating chemically valid molecules with realistic 3D structures.
+### GCDM: Geometry-Complete Diffusion Model
+
+This tutorial uses **GCDM** from the paper ["Geometric Clifford Perceptron Networks for 3D Molecular Generation and Optimization"](https://arxiv.org/abs/2302.04313) (Morehead et al., 2023).
+
+**Key Features:**
+- **3D Structure Generation**: Generates both atom types and 3D coordinates
+- **SE(3) Equivariance**: Respects rotations and translations
+- **Variational Diffusion**: Uses learned prior for better generation quality
+- **Property Conditioning**: Can generate molecules with specific properties
+
+### Architecture
+
+```
+Input: Random noise (positions + atom types)
+    ↓
+Denoising Network (GCPNet or EGNN)
+    - SE(3)-equivariant message passing
+    - Updates both scalar (h) and vector (x) features
+    ↓
+Output: Denoised molecular structure
+    ↓
+Iterative Refinement (T=1000 steps)
+    ↓
+Final: Valid 3D molecular structure
+```
 
 ---
 
@@ -27,11 +51,10 @@ Diffusion models generate data by learning to reverse a gradual noising process.
 
 ```python
 import torch
-from torch_pharma.data import QM9Dataset, DataLoader
-from torch_pharma.models import EDMDiffusion
-from torch_pharma.tasks import MoleculeGenerationTask
-from torch_pharma.training import Trainer
-from torch_pharma.evaluation import BasicMolecularMetrics, ScoringFunction
+from torch_pharma.data.components.edm import retrieve_dataloaders
+from examples.molecule_generation.2302_04313.qm9_mol_gen_ddpm_inference import (
+    QM9MoleculeGenerationDDPM
+)
 ```
 
 ---
@@ -39,76 +62,196 @@ from torch_pharma.evaluation import BasicMolecularMetrics, ScoringFunction
 ## Step 2: Load Data
 
 ```python
-# Load QM9 dataset for training
-dataset = QM9Dataset()
-train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+# Configure data loading
+dataloader_cfg = {
+    "dataset": "QM9",
+    "batch_size": 64,
+    "num_workers": 4,
+    "remove_h": True,          # Remove hydrogens (recommended)
+    "include_charges": True,   # Include formal charges
+    "data_dir": "~/.torch_pharma",
+    "subtract_thermo": True,
+    "force_download": False,
+    "num_radials": 1,
+    "device": "cuda",
+}
 
-print(f"Training on {len(dataset)} molecules")
+# Load data
+dataloaders, charge_scale = retrieve_dataloaders(dataloader_cfg)
+
+print(f"Train batches: {len(dataloaders['train'])}")
+print(f"Validation batches: {len(dataloaders['valid'])}")
 ```
 
 ---
 
-## Step 3: Build the Diffusion Model
+## Step 3: Initialize the Model
 
 ```python
-# Initialize EDM model
-model = EDMDiffusion(
-    n_atoms=29,          # Maximum atoms per molecule
-    n_atom_types=5,      # H, C, N, O, F
-    hidden_dim=256,      # Hidden dimension
-    n_layers=9,          # Number of layers
-    timesteps=1000,      # Diffusion steps
-    noise_schedule="cosine"
+# Define optimizer and scheduler
+def optimizer_fn(params):
+    return torch.optim.AdamW(params, lr=1e-4)
+
+def scheduler_fn(optimizer):
+    return torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=100
+    )
+
+# Initialize GCDM model
+model = QM9MoleculeGenerationDDPM(
+    optimizer=optimizer_fn,
+    scheduler=scheduler_fn,
+    dynamics_network="gcpnet",        # or "egnn"
+    num_timesteps=1000,
+    num_eval_samples=1000,
+    conditioning=['alpha'],           # Condition on polarizability
+    remove_h=True,
+    ddpm_mode="unconditional",        # or "inpainting"
+    loss_type="l2",
+    num_atom_types=5,                 # C, N, O, F, H
+    num_x_dims=3,                     # 3D coordinates
+    include_charges=True,
+    clip_gradients=True,
+    dataloaders=dataloaders           # Required for conditioning
 )
+
+# Move to GPU
+model = model.cuda()
 
 print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 ```
 
+### Model Options
+
+| Parameter | Options | Description |
+|-----------|---------|-------------|
+| `dynamics_network` | `"gcpnet"`, `"egnn"` | Base architecture |
+| `ddpm_mode` | `"unconditional"`, `"inpainting"` | Generation mode |
+| `loss_type` | `"l2"`, `"nll"` | Training objective |
+| `conditioning` | List of properties | Property to condition on |
+
 ---
 
-## Step 4: Create Generation Task
+## Step 4: Training
 
 ```python
-task = MoleculeGenerationTask(
-    model=model,
-    generation_type="diffusion",
-    sampling_steps=1000,
-    temperature=1.0,
-    lr=2e-4
+# Training loop
+for epoch in range(1000):
+    model.train()
+    
+    # Training
+    for batch_idx, batch in enumerate(dataloaders['train']):
+        batch = batch.to(model.device)
+        
+        # Forward pass
+        metrics = model.training_step(batch, batch_idx)
+        loss = metrics['loss']
+        
+        # Backward pass
+        loss.backward()
+        
+        # Gradient clipping
+        model.configure_gradient_clipping(
+            model.configure_optimizers()['optimizer'],
+            gradient_clip_val=1.0
+        )
+        
+        # Update weights
+        optimizer = model.configure_optimizers()['optimizer']
+        optimizer.step()
+        optimizer.zero_grad()
+        
+        if batch_idx % 10 == 0:
+            print(f"Epoch {epoch}, Batch {batch_idx}, Loss: {loss.item():.4f}")
+    
+    # Validation
+    model.eval()
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(dataloaders['valid']):
+            batch = batch.to(model.device)
+            metrics = model.validation_step(batch, batch_idx)
+        
+        model.on_validation_epoch_end()
+    
+    # Save checkpoint
+    if (epoch + 1) % 10 == 0:
+        torch.save(
+            model.state_dict(),
+            f"checkpoints/gcdm_epoch_{epoch}.pt"
+        )
+```
+
+---
+
+## Step 5: Sampling
+
+### Unconditional Generation
+
+```python
+model.eval()
+
+# Generate 100 molecules
+x, one_hot, charges, batch_index = model.sample(num_samples=100)
+
+print(f"Generated positions: {x.shape}")
+print(f"Generated atom types: {one_hot.shape}")
+print(f"Batch indices: {batch_index.shape}")
+```
+
+### Conditional Generation
+
+```python
+# Condition on specific polarizability value
+alpha_value = 75.0  # Example value
+
+# Normalize using training statistics
+alpha_normalized = (
+    alpha_value - model.props_norms['alpha']['mean']
+) / model.props_norms['alpha']['mad']
+
+context = torch.tensor([[alpha_normalized]] * 100).to(model.device)
+
+# Sample with conditioning
+x, one_hot, charges, batch_index = model.sample(
+    num_samples=100,
+    context=context
 )
 ```
 
 ---
 
-## Step 5: Train
+## Step 6: Convert to RDKit Molecules
 
 ```python
-trainer = Trainer(
-    max_epochs=1000,
-    accelerator='auto',
-    log_every_n_steps=100
-)
+from torch_pharma.molecules.chemistry import build_molecule, process_molecule
+from rdkit import Chem
 
-trainer.fit(task, train_loader)
-```
+molecules = []
+for i in range(100):
+    mask = batch_index == i
+    pos = x[mask].cpu()
+    atom_types = one_hot[mask].argmax(-1).cpu()
+    
+    # Build RDKit molecule
+    mol = build_molecule(
+        positions=pos,
+        atom_types=atom_types,
+        dataset_info=model.dataset_info,
+        add_coords=True
+    )
+    
+    # Process and sanitize
+    mol = process_molecule(
+        rdmol=mol,
+        add_hydrogens=True,
+        sanitize=True,
+        relax_iter=200
+    )
+    
+    if mol is not None:
+        molecules.append(mol)
 
----
-
-## Step 6: Generate Molecules
-
-```python
-# Generate 100 new molecules
-generated_mols = task.sample(
-    n_samples=100,
-    n_atoms=29
-)
-
-print(f"Generated {len(generated_mols)} molecules")
-
-# Print some SMILES
-for i, mol in enumerate(generated_mols[:5]):
-    smiles = mol.to_smiles() if hasattr(mol, 'to_smiles') else str(mol)
-    print(f"Molecule {i+1}: {smiles}")
+print(f"Generated {len(molecules)} valid molecules")
 ```
 
 ---
@@ -116,30 +259,39 @@ for i, mol in enumerate(generated_mols[:5]):
 ## Step 7: Evaluate
 
 ```python
-from rdkit import Chem
-from torch_pharma.evaluation import BasicMolecularMetrics
-
-# Convert to RDKit
-rdmols = []
-for mol in generated_mols:
-    if isinstance(mol, str):
-        rdmol = Chem.MolFromSmiles(mol)
-    else:
-        rdmol = mol.to_rdkit() if hasattr(mol, 'to_rdkit') else None
-    if rdmol:
-        rdmols.append(rdmol)
-
-# Compute metrics
-metrics = BasicMolecularMetrics(
-    dataset_info=dataset_info,
-    data_dir="data"
+# Use model's built-in evaluation
+results = model.sample_and_analyze(
+    num_samples=1000,
+    batch_size=64,
+    save_molecules=True,
+    output_dir="output/molecules"
 )
 
-validity, uniqueness, novelty = metrics.evaluate_rdmols(rdmols, verbose=True)
+print("Evaluation Results:")
+print(f"  Validity: {results['validity']:.3f}")
+print(f"  Uniqueness: {results['uniqueness']:.3f}")
+print(f"  Novelty: {results['novelty']:.3f}")
+print(f"  Molecular Stability: {results['mol_stable']:.3f}")
+print(f"  Atom Stability: {results['atm_stable']:.3f}")
+```
 
-# Compute QED scores
-qed_scores = [ScoringFunction.qed_score(m) for m in rdmols]
-print(f"Average QED: {sum(qed_scores)/len(qed_scores):.3f}")
+---
+
+## Step 8: Visualization
+
+```python
+# Save and visualize generated molecules
+model.sample_and_save(
+    num_samples=10,
+    num_timesteps=1000,
+    sampling_output_dir="output/visualizations"
+)
+
+# Visualize diffusion chain
+model.sample_chain_and_save(
+    keep_frames=100,
+    num_tries=5
+)
 ```
 
 ---
@@ -148,51 +300,88 @@ print(f"Average QED: {sum(qed_scores)/len(qed_scores):.3f}")
 
 ```python
 import torch
-from torch_pharma.data import QM9Dataset, DataLoader
-from torch_pharma.models import EDMDiffusion
-from torch_pharma.tasks import MoleculeGenerationTask
-from torch_pharma.training import Trainer
-from torch_pharma.evaluation import BasicMolecularMetrics
-from rdkit import Chem
+from torch_pharma.data.components.edm import retrieve_dataloaders
+from examples.molecule_generation.2302_04313.qm9_mol_gen_ddpm_inference import (
+    QM9MoleculeGenerationDDPM
+)
 
 # 1. Load data
-dataset = QM9Dataset()
-train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+dataloader_cfg = {
+    "dataset": "QM9",
+    "batch_size": 64,
+    "num_workers": 4,
+    "remove_h": True,
+    "include_charges": True,
+    "data_dir": "~/.torch_pharma",
+}
+dataloaders, _ = retrieve_dataloaders(dataloader_cfg)
 
-# 2. Build model
-model = EDMDiffusion(
-    n_atoms=29,
-    n_atom_types=5,
-    hidden_dim=256,
-    n_layers=9,
-    timesteps=1000
-)
+# 2. Initialize model
+def optimizer_fn(params): return torch.optim.AdamW(params, lr=1e-4)
+def scheduler_fn(optimizer): return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
 
-# 3. Create task
-task = MoleculeGenerationTask(
-    model=model,
-    generation_type="diffusion",
-    lr=2e-4
-)
+model = QM9MoleculeGenerationDDPM(
+    optimizer=optimizer_fn,
+    scheduler=scheduler_fn,
+    dynamics_network="gcpnet",
+    num_timesteps=1000,
+    conditioning=['alpha'],
+    remove_h=True,
+    dataloaders=dataloaders
+).cuda()
 
-# 4. Train
-trainer = Trainer(max_epochs=1000, accelerator='auto')
-trainer.fit(task, train_loader)
+# 3. Train (simplified)
+for epoch in range(100):
+    for batch in dataloaders['train']:
+        batch = batch.to(model.device)
+        metrics = model.training_step(batch, 0)
+        # ... optimization code
 
-# 5. Generate
-generated_mols = task.sample(n_samples=100)
+# 4. Generate
+model.eval()
+x, one_hot, charges, batch_index = model.sample(num_samples=100)
 
-# 6. Evaluate
-rdmols = [m.to_rdkit() for m in generated_mols]
-metrics = BasicMolecularMetrics(dataset_info, "data")
-scores = metrics.evaluate_rdmols(rdmols)
+# 5. Evaluate
+results = model.sample_and_analyze(num_samples=1000)
+print(f"Validity: {results['validity']:.3f}")
 ```
 
 ---
 
 ## Tips for Better Generation
 
-1. **Train longer**: Diffusion models need many epochs
-2. **Use more data**: Train on ZINC for diversity
-3. **Tune temperature**: Lower = more conservative
-4. **Filter by property**: Use property prediction models as filters
+1. **Train longer**: GCDM benefits from 1000+ epochs
+2. **Use GCPNet**: Generally outperforms EGNN for 3D generation
+3. **Condition on properties**: Guides generation toward desired chemical space
+4. **Tune temperature**: Affects sampling diversity (not shown in basic API)
+5. **Filter by stability**: Post-process to keep only stable molecules
+
+---
+
+## Advanced: Inpainting
+
+Modify parts of molecules while keeping others fixed:
+
+```python
+# Fix first 5 atoms, generate the rest
+num_nodes = torch.tensor([20])
+node_mask = torch.zeros(20, dtype=torch.bool)
+node_mask[0:5] = True  # These will be fixed
+
+molecules = model.generate_molecules(
+    ddpm_mode="inpainting",
+    num_samples=1,
+    num_nodes=num_nodes,
+    node_mask=node_mask,
+    sanitize=True,
+    add_hydrogens=True
+)
+```
+
+---
+
+## References
+
+- [GCDM Paper](https://arxiv.org/abs/2302.04313) - Morehead et al., 2023
+- [EDM Paper](https://arxiv.org/abs/2203.17003) - Hoogeboom et al., 2022
+- Example code: `examples/molecule_generation/2302_04313/`

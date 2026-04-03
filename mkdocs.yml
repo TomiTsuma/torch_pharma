@@ -103,83 +103,22 @@ nav:
     - Property Prediction: tutorials/property_prediction.md
     - Molecule Generation: tutorials/molecule_generation.md
     - RL Optimization: tutorials/rl_optimization.md
-    - Binding Affinity: tutorials/binding_affinity.md
-    - Custom Datasets: tutorials/custom_datasets.md
   
   - Datasets:
     - datasets/index.md
-    - datasets/qm9.md
-    - datasets/zinc.md
-    - datasets/bindingdb.md
-    - datasets/custom.md
   
   - API Reference:
     - api/index.md
-    - Molecules:
-      - api/molecules/index.md
-      - api/molecules/molecule.md
-      - api/molecules/featurizers.md
-      - api/molecules/chemistry.md
-      - api/molecules/graph.md
-    - Data:
-      - api/data/index.md
-      - api/data/datasets.md
-      - api/data/loaders.md
-      - api/data/transforms.md
-      - api/data/components.md
-    - Models:
-      - api/models/index.md
-      - api/models/gnn.md
-      - api/models/transformers.md
-      - api/models/diffusion.md
-      - api/models/dynamics.md
-      - api/models/protein.md
-    - Tasks:
-      - api/tasks/index.md
-      - api/tasks/property_prediction.md
-      - api/tasks/molecule_generation.md
-      - api/tasks/toxicity_prediction.md
-      - api/tasks/binding_affinity.md
-    - Training:
-      - api/training/index.md
-      - api/training/trainer.md
-      - api/training/callbacks.md
-      - api/training/checkpointing.md
-    - Reinforcement Learning:
-      - api/rl/index.md
-      - api/rl/agents.md
-      - api/rl/environments.md
-      - api/rl/rewards.md
-    - Evaluation:
-      - api/evaluation/index.md
-      - api/evaluation/metrics.md
-      - api/evaluation/scoring.md
-      - api/evaluation/benchmarks.md
-    - Features:
-      - api/features/index.md
-      - api/features/geometry.md
-      - api/features/batch.md
-    - Integrations:
-      - api/integrations/index.md
-      - api/integrations/rdkit.md
-      - api/integrations/pyg.md
-      - api/integrations/wandb.md
-    - Utilities:
-      - api/utils/index.md
-      - api/utils/io.md
-      - api/utils/logging.md
-      - api/utils/math.md
-      - api/utils/visualize.md
+    - Molecules: api/molecules/index.md
+    - Data: api/data/index.md
+    - Models: api/models/index.md
+    - Tasks: api/tasks/index.md
+    - Training: api/training/index.md
+    - Reinforcement Learning: api/rl/index.md
+    - Evaluation: api/evaluation/index.md
   
   - Examples:
-    - examples/index.md
-    - Property Prediction: examples/property_prediction.md
-    - Molecule Generation: examples/molecule_generation.md
-    - RL Optimization: examples/rl_optimization.md
-  
-  - Development:
-    - development/contributing.md
-    - development/changelog.md
+    - Molecule Generation (GCDM): examples/molecule_generation/index.md
 
 extra_css:
   - stylesheets/extra.css
