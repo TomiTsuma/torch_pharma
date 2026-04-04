@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import imageio
 import wandb
 from typing import Any, Dict, List, Optional, Union, Tuple
-from matplotlib.axes._subplots import Axes
+from matplotlib.axes import Axes
 from wandb.sdk.wandb_run import Run
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked

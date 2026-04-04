@@ -47,13 +47,17 @@ class QM9Dataset(BaseDataset):
     def __init__(self, calculate_thermo=True):
         super().__init__()
         self.gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "QM9")
+        if os.path.exists(self.gdb9_dir):
+            print("Path exists")
+        else:
+            os.makedirs(self.gdb9_dir, exist_ok=True)
         self.dataset = "QM9"
         self.calculate_thermo = calculate_thermo
         if "atomref.txt" not in os.listdir(self.gdb9_dir) or "uncharacterized.txt" not in os.listdir(self.gdb9_dir) or "data.tar.bz2" not in os.listdir(self.gdb9_dir):
             self.download()
         else:
             self.process()
-        self.mols_smiles = self.compute_smiles(self, remove_h=False)
+        self.mols_smiles = self.compute_smiles(remove_h=False)
 
     def download(self):
         download_qm9()

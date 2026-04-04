@@ -1,11 +1,11 @@
 [pypi-image]: https://badge.fury.io/py/torch-pharma.svg
 [pypi-url]: https://pypi.org/project/torch-pharma/
-[testing-image]: https://github.com/yourusername/torch-pharma/actions/workflows/testing.yml/badge.svg
-[testing-url]: https://github.com/yourusername/torch-pharma/actions/workflows/testing.yml
+[testing-image]: https://github.com/TomiTsuma/torch-pharma/actions/workflows/testing.yml/badge.svg
+[testing-url]: https://github.com/TomiTsuma/torch-pharma/actions/workflows/testing.yml
 [docs-image]: https://readthedocs.org/projects/torch-pharma/badge/?version=latest
 [docs-url]: https://torch-pharma.readthedocs.io
-[coverage-image]: https://codecov.io/gh/yourusername/torch-pharma/branch/main/graph/badge.svg
-[coverage-url]: https://codecov.io/gh/yourusername/torch-pharma
+[coverage-image]: https://codecov.io/gh/TomiTsuma/torch-pharma/branch/main/graph/badge.svg
+[coverage-url]: https://codecov.io/gh/TomiTsuma/torch-pharma
 
 # Torch Pharma
 
@@ -78,7 +78,12 @@ Torch Pharma addresses these limitations by introducing a task-oriented and exte
 ### From PyPI
 
 ```bash
-pip install torch-pharma
+sudo apt update
+sudo apt install build-essential g++
+sudo apt install openbabel python3-openbabel
+python3 -m pip install pyg_lib torch_scatter torch_sparse torch_cluster -f https://data.pyg.org/whl/torch-2.9.0+cu128.html
+python3 -m pip install --no-build-isolation -e .
+
 ````
 
 ### From Source

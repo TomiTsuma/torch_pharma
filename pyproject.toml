@@ -22,17 +22,23 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
 dependencies = [
-    "torch>=2.0.0",
+    "torch",
     "numpy",
     "pandas",
     "rdkit",
     "torch-cluster",
     "torch-scatter",
     "torch-sparse",
-    "torch-spline-conv",
     "torch-geometric",
     "tqdm",
     "pyyaml",
+    "torchtyping",
+    "omegaconf",
+    "openbabel-wheel",
+    "gdown",
+    "imageio",
+    "wandb",
+    "mlflow"
 ]
 
 [project.optional-dependencies]
