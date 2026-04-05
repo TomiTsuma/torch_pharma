@@ -1,10 +1,10 @@
 # GCDM: Geometry-Complete Diffusion Model
 
-This example implements the **Geometry-Complete Diffusion Model (GCDM)** from the paper ["Geometric Clifford Perceptron Networks for 3D Molecular Generation and Optimization"](https://arxiv.org/abs/2302.04313).
+This example implements the **Geometry-Complete Diffusion Model (GCDM)** from the paper ["Geometry-Complete Diffusion for 3D Molecule Generation and Optimization"](https://arxiv.org/abs/2302.04313).
 
 ## Paper Reference
 
-**Title:** Geometric Clifford Perceptron Networks for 3D Molecular Generation and Optimization  
+**Title:** Geometry-Complete Diffusion for 3D Molecule Generation and Optimization 
 **Authors:** Morehead et al., 2023  
 **Paper:** [arXiv:2302.04313](https://arxiv.org/abs/2302.04313)
 
@@ -77,8 +77,37 @@ ddpm = EquivariantVariationalDiffusion(
 
 #### 3. Training Module
 
+To actively track structural graph propagation during Generation, the module is cleanly decorated via the intrinsic tracking framework integrating directly with standard telemetry backends (W&B / MLflow):
+
 ```python
 from examples.molecule_generation.2302_04313.qm9_mol_gen_ddpm_inference import QM9MoleculeGenerationDDPM
+from torch_pharma.utils.tracking import track_gnn_activations
+from torch_pharma.utils.tracking.loggers import WandbActivationLogger, MlflowActivationLogger
+
+@track_gnn_activations(
+    track_layers=True,
+    track_nodes=True,
+    track_edges=True,
+    verbose=False,
+    # Filter core graph messaging layers to prevent OOM API request timeouts on 1000s of generic sub-modules
+    layer_filter=lambda name, mod: "interaction" in name.lower() or "conv" in name.lower(),
+    loggers=[
+        WandbActivationLogger(
+            prefix="QM9MoleculeGenerationDDPM", 
+            log_raw_tensors=False, 
+            project="torch-pharma-QM9MoleculeGenerationDDPM", 
+            name="demo-run"
+        ),
+        MlflowActivationLogger(
+            prefix="QM9MoleculeGenerationDDPM", 
+            tracking_uri="localhost:5000",
+            experiment_name="torch-pharma-QM9MoleculeGenerationDDPM", 
+            run_name="demo-run"
+        )
+    ]
+)
+class QM9MoleculeGenerationDDPM(nn.Module):
+    pass
 
 model = QM9MoleculeGenerationDDPM(
     optimizer=torch.optim.AdamW,
@@ -294,10 +323,14 @@ nll = loss_t + loss_0 + kl_prior - delta_log_px - log_pN
 If you use this implementation, please cite:
 
 ```bibtex
-@article{morehead2023geometric,
-  title={Geometric Clifford Perceptron Networks for 3D Molecular Generation and Optimization},
-  author={Morehead, Alex and Chen, Jianmo and Cheng, Yu and Xie, Jian and Davis, Joseph and Xiong, Jianlin and Wang, Chenyu and Wang, Yanli and Xiao, Jinzhuo and Li, Jianlin},
-  journal={arXiv preprint arXiv:2302.04313},
-  year={2023}
+@article{morehead2024geometry,
+  title={Geometry-complete diffusion for 3D molecule generation and optimization},
+  author={Morehead, Alex and Cheng, Jianlin},
+  journal={Communications Chemistry},
+  volume={7},
+  number={1},
+  pages={150},
+  year={2024},
+  publisher={Nature Publishing Group UK London}
 }
 ```
