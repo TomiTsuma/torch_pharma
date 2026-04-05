@@ -79,9 +79,34 @@ print("typeguard/torchtyping imported", flush=True)
 
 patch_typeguard()  # use before @typechecked
 
+from torch_pharma.utils.tracking import track_gnn_activations
+from torch_pharma.utils.tracking.loggers import WandbActivationLogger, MlflowActivationLogger
 
 
 
+
+@track_gnn_activations(
+            track_layers=True,
+            track_nodes=True,
+            track_edges=True,
+            verbose=False,
+            # Filter specifically to core graph messaging layers to avoid OOM or API request timeouts
+            layer_filter=lambda name, mod: "interaction" in name.lower() or "conv" in name.lower(),
+            loggers=[
+                WandbActivationLogger(
+                    prefix="QM9MoleculeGenerationDDPM", 
+                    log_raw_tensors=False, # True would upload HUNDREDS of histograms per batch, slowing down tracking
+                    project="torch-pharma-QM9MoleculeGenerationDDPM", 
+                    name="demo-run"
+                ),
+                MlflowActivationLogger(
+                    prefix="QM9MoleculeGenerationDDPM", 
+                    tracking_uri="http://localhost:5000", # Route data to explicit loc
+                    experiment_name="torch-pharma-QM9MoleculeGenerationDDPM", 
+                    run_name="demo-run"
+                )
+            ]
+        )
 class QM9MoleculeGenerationDDPM(nn.Module):
     def __init__(
         self,
@@ -392,6 +417,8 @@ class QM9MoleculeGenerationDDPM(nn.Module):
                 self.num_context_node_feats = None
 
     def training_step(self, batch: Batch, batch_idx: int) -> Dict[str, Any]:
+        self.global_step += 1
+        
         try:
             nll, metrics_dict = self.step(batch)
         except RuntimeError as e:
