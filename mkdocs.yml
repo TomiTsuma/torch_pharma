@@ -119,6 +119,8 @@ nav:
   
   - Examples:
     - Molecule Generation (GCDM): examples/molecule_generation/index.md
+  
+  - Roadmap: roadmap.md
 
 extra_css:
   - stylesheets/extra.css
