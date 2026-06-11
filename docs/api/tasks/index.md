@@ -19,6 +19,21 @@ from torch_pharma.tasks import (
 
 ---
 
+## NextMol Tasks
+
+NExT-Mol training tasks for diffusion with LLM conditioning.
+
+```python
+from torch_pharma.tasks.molecule_generation import (
+    NextMolDMTTask,
+    NextMolLLMTask,
+)
+```
+
+See the [NExT-Mol Integration](../../../next-mol-implementation/README.md) guide for details.
+
+---
+
 ## Base Task
 
 ### BaseTask

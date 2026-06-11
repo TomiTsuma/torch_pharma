@@ -19,6 +19,30 @@ from torch_pharma.data import (
 
 ---
 
+## NextMol Data Components
+
+For NExT-Mol (Diffusion with Language Models) workflows:
+
+```python
+from torch_pharma.data.components.nextmol import (
+    QM9Collater,
+    QM9InferCollater,
+    LMCollater,
+    NextMolBatch,
+    get_dataset_info,
+)
+
+from torch_pharma.data.components.nextmol.datasets import (
+    QM9TorDFDataset,
+    QM9LMDataset,
+    GeomDrugsTorDFDataset,
+)
+```
+
+See the [NextMol Data Components](./nextmol/index.md) guide for details.
+
+---
+
 ## Datasets
 
 ### BaseDataset

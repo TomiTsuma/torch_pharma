@@ -111,11 +111,17 @@ nav:
     - api/index.md
     - Molecules: api/molecules/index.md
     - Data: api/data/index.md
+    - Data Components:
+      - api/data/components/index.md
+      - NextMol Data: api/data/components/nextmol/index.md
     - Models: api/models/index.md
     - Tasks: api/tasks/index.md
     - Training: api/training/index.md
     - Reinforcement Learning: api/rl/index.md
     - Evaluation: api/evaluation/index.md
+    - Evaluation Metrics:
+      - api/evaluation/metrics/index.md
+      - NextMol Metrics: api/evaluation/metrics/nextmol/index.md
   
   - Examples:
     - Molecule Generation (GCDM): examples/molecule_generation/index.md
@@ -123,7 +129,7 @@ nav:
   - Roadmap: roadmap.md
 
   - NExT-Mol Integration:
-    - next-mol-implementation/README.md
+    - Overview: next-mol-implementation/README.md
     - Architecture Comparison: next-mol-implementation/02-architecture-comparison.md
     - Data Pipeline: next-mol-implementation/07-data-pipeline.md
     - Training Workflows: next-mol-implementation/09-training-workflows.md

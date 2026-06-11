@@ -18,6 +18,23 @@ from torch_pharma.evaluation import (
 
 ---
 
+## NextMol Metrics
+
+For NExT-Mol generation quality evaluation:
+
+```python
+from torch_pharma.evaluation.nextmol import (
+    compute_rmsd,
+    conformer_recall,
+    validity_rate,
+    uniqueness_rate,
+)
+```
+
+See the [NextMol Metrics](./metrics/nextmol/index.md) guide for details.
+
+---
+
 ## Molecular Metrics
 
 ### BasicMolecularMetrics
