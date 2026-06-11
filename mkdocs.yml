@@ -122,5 +122,12 @@ nav:
   
   - Roadmap: roadmap.md
 
+  - NExT-Mol Integration:
+    - next-mol-implementation/README.md
+    - Architecture Comparison: next-mol-implementation/02-architecture-comparison.md
+    - Data Pipeline: next-mol-implementation/07-data-pipeline.md
+    - Training Workflows: next-mol-implementation/09-training-workflows.md
+    - Checkpoint Migration: next-mol-implementation/13-checkpoint-migration.md
+
 extra_css:
   - stylesheets/extra.css

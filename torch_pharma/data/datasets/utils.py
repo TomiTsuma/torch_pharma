@@ -10,9 +10,11 @@ from typeguard import typechecked
 
 patch_typeguard()  # use before @typechecked
 
-# Constants
-TORCH_PHARMA_HOME = Path.home() / ".torch_pharma"
-TORCH_PHARMA_HOME.mkdir(parents=True, exist_ok=True)
+# Constants — canonical home lives in torch_pharma.paths
+from torch_pharma.paths import TORCH_PHARMA_HOME, TORCH_PHARMA_DATA
+from torch_pharma.utils.logging import get_pylogger
+
+log = get_pylogger(__name__)
 
 ## QM9 Download links
 QM9_ATOMREF_URL = "https://drive.google.com/uc?id=1C1Jy_XJsrdzS33cAGGc10g6F_OO547e5"
@@ -182,12 +184,14 @@ def get_dataset_info(dataset_name: str, remove_h: bool) -> Dict[str, Any]:
 
 
 def download_qm9():
-    os.makedirs(os.path.join(str(TORCH_PHARMA_HOME), "QM9"), exist_ok=True)
-    gdown.download(QM9_ATOMREF_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/atomref.txt"), quiet=False)
-    gdown.download(QM9_DATA_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/data.tar.bz2"), quiet=False)
-    gdown.download(QM9_UNCHARACTERIZED_URL, os.path.join(str(TORCH_PHARMA_HOME), "QM9/uncharacterized.txt"), quiet=False)
-
-    return os.path.join(str(TORCH_PHARMA_HOME), "QM9")
+    qm9_dir = os.path.join(str(TORCH_PHARMA_HOME), "QM9")
+    os.makedirs(qm9_dir, exist_ok=True)
+    log.info("Downloading QM9 dataset to %s", qm9_dir)
+    gdown.download(QM9_ATOMREF_URL, os.path.join(qm9_dir, "atomref.txt"), quiet=False)
+    gdown.download(QM9_DATA_URL, os.path.join(qm9_dir, "data.tar.bz2"), quiet=False)
+    gdown.download(QM9_UNCHARACTERIZED_URL, os.path.join(qm9_dir, "uncharacterized.txt"), quiet=False)
+    log.info("QM9 download complete")
+    return qm9_dir
 
 
 def process_xyz_files(data, process_file_fn, file_ext=None, file_idx_list=None, stack=True):

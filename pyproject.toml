@@ -50,6 +50,15 @@ dev = [
     "mkdocs",
     "mkdocs-material",
 ]
+nextmol = [
+    "selfies",
+    "transformers>=4.36",
+    "peft",
+    "accelerate",
+    "scipy",
+    "nltk",
+    "rouge-score",
+]
 
 [project.scripts]
 torch-pharma = "torch_pharma.cli.train:main"

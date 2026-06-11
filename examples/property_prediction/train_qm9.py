@@ -1,3 +1,19 @@
-import torch
-# Example QM9 training script
-print("Training QM9...")
+import argparse
+
+from torch_pharma.utils.logging import get_pylogger, setup_logging
+
+log = get_pylogger(__name__)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="QM9 property prediction training")
+    parser.add_argument("--log_level", type=str, default="INFO")
+    parser.add_argument("--log_file", type=str, default=None)
+    args = parser.parse_args()
+
+    setup_logging(level=args.log_level, log_file=args.log_file, run_name="train_qm9")
+    log.info("Starting QM9 property prediction training")
+
+
+if __name__ == "__main__":
+    main()

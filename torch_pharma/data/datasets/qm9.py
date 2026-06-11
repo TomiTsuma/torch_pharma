@@ -21,7 +21,9 @@ from torch_pharma.data.datasets.utils import download_qm9, TORCH_PHARMA_HOME, pr
 from torch_pharma.data.datasets.base import BaseDataset
 from torch_pharma.molecules.chemistry import mol2smiles, build_molecule, process_molecule
 from torch_pharma.data.components.edm import retrieve_dataloaders, get_bond_order_batch, get_bond_length_arrays
+from torch_pharma.utils.logging import get_pylogger
 
+log = get_pylogger(__name__)
 
 patch_typeguard()  # use before @typechecked
 
@@ -47,15 +49,18 @@ class QM9Dataset(BaseDataset):
     def __init__(self, calculate_thermo=True):
         super().__init__()
         self.gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "QM9")
-        if os.path.exists(self.gdb9_dir):
-            print("Path exists")
-        else:
+        if not os.path.exists(self.gdb9_dir):
             os.makedirs(self.gdb9_dir, exist_ok=True)
+            log.info("Created QM9 data directory at %s", self.gdb9_dir)
+        else:
+            log.debug("QM9 data directory exists at %s", self.gdb9_dir)
         self.dataset = "QM9"
         self.calculate_thermo = calculate_thermo
         if "atomref.txt" not in os.listdir(self.gdb9_dir) or "uncharacterized.txt" not in os.listdir(self.gdb9_dir) or "data.tar.bz2" not in os.listdir(self.gdb9_dir):
+            log.info("QM9 raw files missing — starting download")
             self.download()
         else:
+            log.info("QM9 raw files found — starting processing")
             self.process()
         self.mols_smiles = self.compute_smiles(remove_h=False)
 

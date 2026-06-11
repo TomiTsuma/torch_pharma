@@ -155,3 +155,27 @@ class PredefinedNoiseSchedule(nn.Module):
     def forward(self, t: torch.Tensor) -> torch.Tensor:
         t_int = torch.round(t * self.timesteps).long()
         return self.gamma[t_int]
+
+
+
+@torch.jit.script
+def gaussian(x, mean, std):
+    pi = 3.14159
+    a = (2 * pi) ** 0.5
+    return torch.exp(-0.5 * (((x - mean) / std) ** 2)) / (a * std)
+
+
+class GaussianLayer(nn.Module):
+    """Gaussian basis function layer for 3D distance features"""
+    def __init__(self, K, *args, **kwargs):
+        super().__init__()
+        self.K = K - 1
+        self.means = nn.Embedding(1, self.K)
+        self.stds = nn.Embedding(1, self.K)
+        nn.init.uniform_(self.means.weight, 0, 3)
+        nn.init.uniform_(self.stds.weight, 0, 3)
+
+    def forward(self, x, *args, **kwargs):
+        mean = self.means.weight.float().view(-1)
+        std = self.stds.weight.float().view(-1).abs() + 1e-5
+        return torch.cat([x, gaussian(x, mean, std).type_as(self.means.weight)], dim=-1)

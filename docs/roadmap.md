@@ -34,7 +34,7 @@ A massive portion of the literature focuses on continuous and discrete diffusion
 - [ ] **ChemBFN (Bayesian Flow Networks)**
 - [ ] **DiffSMol**
 - [ ] **UDM-3D**
-- [ ] **DMT**
+- [x] **DMT** — native port in `torch_pharma/models/diffusion/dmt.py`; see [NExT-Mol integration docs](next-mol-implementation/README.md)
 
 ---
 
@@ -72,7 +72,7 @@ These models treat molecules as 1D sequences (e.g., SMILES, SELFIES) or generate
 - [ ] **SMILES LSTM**
 - [ ] **MolRNN**
 - [ ] **GraphINVENT**
-- [ ] **MoLLaMA**: SELFIES-based foundation model used to guide 3D generators.
+- [x] **MoLLaMA**: SELFIES-based foundation model — HF integration in `torch_pharma/models/llm/`; see [NExT-Mol integration docs](next-mol-implementation/README.md)
 - [ ] **SoftBD / SoftMol**: Utilize block-diffusion and gated Monte Carlo Tree Search.
 - [ ] **GVT (Graph VQ-Transformer)**
 - [ ] **DGAE**: Hybrid VQ-VAE autoregressive frameworks.
