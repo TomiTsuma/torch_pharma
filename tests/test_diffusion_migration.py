@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch_geometric.data import Batch
 from torch_pharma.models.diffusion.variational_diffusion import EquivariantVariationalDiffusion
-from torch_pharma.models.dynamics.egnn import EGNNDynamics
+from torch_pharma.models.gnn.egnn import EGNNDynamics
 
 def test_diffusion_initialization():
     print("Testing EquivariantVariationalDiffusion initialization...")

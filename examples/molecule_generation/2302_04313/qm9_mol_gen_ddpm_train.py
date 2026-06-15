@@ -58,12 +58,12 @@ from torch_pharma.data.datasets.utils import QM9_SECOND_HALF, QM9_WITH_H, QM9_WI
 print("datasets utils imported", flush=True)
 from torch_pharma.data.components.edm import check_molecular_stability, get_bond_length_arrays, retrieve_dataloaders
 print("edm imported", flush=True)
-from torch_pharma.models.dynamics.egnn import EGNNDynamics
+from torch_pharma.models.gnn.egnn import EGNNDynamics
 print("egnn imported", flush=True)
 from torch_pharma.models.diffusion.variational_diffusion import EquivariantVariationalDiffusion
 print("diffusion imported", flush=True)
 
-from torch_pharma.models.dynamics.gcpnet import GCPNetDynamics
+from torch_pharma.models.gnn.gcpnet import GCPNetDynamics
 print("gcpnet imported", flush=True)
 from torch_pharma.models.transformers import HALT_FILE_EXTENSION, CategoricalDistribution, PropertiesDistribution, Queue, compute_mean_mad, get_grad_norm, log_grad_flow_lite
 print("transformers imported", flush=True)

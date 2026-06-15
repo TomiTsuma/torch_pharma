@@ -42,7 +42,7 @@ def test_nextmol_tasks_import():
 def test_dgt_diffusion_config_instantiation():
     from types import SimpleNamespace
 
-    from torch_pharma.models.diffusion.config import DGTDiffusionConfig
+    from torch_pharma.config.model.nextmol.config import DGTDiffusionConfig
     from torch_pharma.models.diffusion.dmt import DGTDiffusion
 
     cfg = DGTDiffusionConfig.dmt_b()

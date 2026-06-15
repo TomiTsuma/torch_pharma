@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch_pharma.models.dynamics.egnn import CoorsNorm
+from torch_pharma.models.gnn.egnn import CoorsNorm
 from torch_scatter import scatter
 from torch_pharma.models.diffusion.utils import modulate
 

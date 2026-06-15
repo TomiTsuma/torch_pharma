@@ -12,12 +12,12 @@ from torch_geometric.data import Batch
 from torch_pharma.models.dynamics.utils import NODE_FEATURE_DIFFUSION_TARGETS
 from torch_pharma.features import ScalarVector, centralize
 from torch_pharma.data.components.edm.edm_dataset import _edge_features, _node_features
-from torch_pharma.models.dynamics.gcpnet import GCPNetDynamics
+from torch_pharma.models.gnn.gcpnet import GCPNetDynamics
 
 from typeguard import typechecked
 from torchtyping import TensorType, patch_typeguard
 
-from torch_pharma.modules.activation import SiLU
+from torch_pharma.models.activation.activation import SiLU
 from torch_pharma.models.dynamics import exists, fourier_encode_dist, embedd_token
 
 patch_typeguard()

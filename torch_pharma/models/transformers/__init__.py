@@ -27,7 +27,7 @@ patch_typeguard()  # use before @typechecked
 HALT_FILE_EXTENSION = "done"
 
 
-from torch_pharma.modules.activation import get_nonlinearity
+from torch_pharma.models.activation.activation import get_nonlinearity
 
 
 @typechecked

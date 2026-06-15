@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional
-from torch_pharma.models.normalization.RMSNorm import LlamaRMSNorm
+from torch_pharma.models.normalization.normalizer import LlamaRMSNorm
 from torch_pharma.models.transformers.attention import LlamaAttention
 from torch_pharma.models.mlp.llama_mlp import LlamaMLP
 

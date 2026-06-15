@@ -11,7 +11,7 @@ from torch import nn
 from torch_geometric.utils import to_dense_batch
 
 from torch_pharma.features.kabsch import get_align_noise
-from torch_pharma.models.diffusion.config import DGTDiffusionConfig, NextMolTrainingConfig
+from torch_pharma.config.model.nextmol.config import DGTDiffusionConfig, NextMolTrainingConfig
 from torch_pharma.models.diffusion.dmt import DGTDiffusion
 from torch_pharma.models.diffusion.sde_sampler import reverse_vp_sde_sample
 from torch_pharma.models.diffusion.vp_scheduler import NoiseScheduleVPV2

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch_pharma.models.decoder.decoder import LlamaDecoder
 from torch_pharma.models.embedding.rotary_embedding import LlamaRotaryEmbedding
-from torch_pharma.models.normalization.RMSNorm import LlamaRMSNorm
+from torch_pharma.models.normalization.normalizer import LlamaRMSNorm
 
 
 class LlamaModel(nn.Module):

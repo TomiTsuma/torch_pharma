@@ -26,4 +26,4 @@ from torch_pharma.utils.math import (
     is_identity
 )
 
-from torch_pharma.modules.activation import get_nonlinearity
+from torch_pharma.models.activation.activation import get_nonlinearity

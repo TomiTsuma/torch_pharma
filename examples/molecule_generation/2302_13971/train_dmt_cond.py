@@ -3,7 +3,7 @@
 import argparse
 
 from torch_pharma.data.datamodules.nextmol_dm import build_nextmol_dataloaders
-from torch_pharma.models.diffusion.config import DGTDiffusionConfig, NextMolTrainingConfig
+from torch_pharma.config.model.nextmol.config import DGTDiffusionConfig, NextMolTrainingConfig
 from torch_pharma.models.llm.mollama import init_mollama_tokenizer
 from torch_pharma.paths import NEXTMOL_DMT_CHECKPOINTS, NEXTMOL_QM9_TORDF, resolve_checkpoint_dir, resolve_data_root
 from torch_pharma.tasks.molecule_generation.nextmol_dmt_task import NextMolDMTTask

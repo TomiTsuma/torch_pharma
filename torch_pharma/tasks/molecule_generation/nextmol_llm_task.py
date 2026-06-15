@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 import torch
 from torch import nn
 
-from torch_pharma.models.diffusion.config import NextMolTrainingConfig
+from torch_pharma.config.model.nextmol.config import NextMolTrainingConfig
 from torch_pharma.models.llm.mollama import load_mollama
 from torch_pharma.tasks.base import BaseTask
 from torch_pharma.utils.logging import get_pylogger

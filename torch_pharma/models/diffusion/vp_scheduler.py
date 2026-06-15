@@ -6,6 +6,9 @@ from torch_scatter import scatter
 
 
 def get_polynomial_schedule(time_steps: int, s: float = 1e-4, power: int = 2) -> torch.Tensor:
+    """
+    A noise schedule based on a simple polynomial equation: 1 - x^power. (from E3 Diffusion)
+    """
     steps = time_steps + 1
     x = torch.linspace(0, steps, steps)
     alphas2 = (1 - torch.pow(x / steps, power)) ** 2
@@ -64,6 +67,11 @@ class NoiseScheduleVPV2:
         discrete_mode: bool = False,
         dtype=torch.float32,
     ):
+        """
+        Create a wrapper class for the forward SDE (VP type). From DPM-Solver.
+        Notes: cosine schedule for continuous-time setting may face numerical issues. Please refer to the latest version
+            of DPM-Solver (https://github.com/LuChengTHU/dpm-solver) for further modification.
+        """
         self.discrete_mode = discrete_mode
         if schedule not in ("discrete", "linear", "cosine", "discrete_poly"):
             raise ValueError(f"Unsupported noise schedule: {schedule}")

@@ -126,9 +126,7 @@ python examples/molecule_generation/next_mol/train_dmt_uncond.py \
   --max_epochs 2 --batch_size 4
 
 # Custom checkpoint location
-python examples/molecule_generation/next_mol/train_dmt_uncond.py \
-  --checkpoint_dir ~/.torch_pharma/checkpoints/nextmol/dmt/uncond_qm9 \
-  --max_epochs 100 --batch_size 32
+python3.11 examples/molecule_generation/next_mol/train_dmt_uncond.py  --checkpoint_dir ~/.torch_pharma/checkpoints/nextmol/dmt/uncond_qm9 --max_epochs 100 --batch_size 32
 ```
 
 Conformer prediction (DMT only, no LLM) — set `use_llm=False` programmatically (see [Programmatic training](#programmatic-training) below). The example script defaults `use_llm=True`.

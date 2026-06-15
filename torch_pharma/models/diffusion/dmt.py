@@ -15,7 +15,7 @@ from torch_pharma.models.message_passing.transformation_layer import (
 )
 from torch_pharma.models.diffusion.utils import coord2dist, remove_mean_with_mask, remove_mean
 from torch_pharma.models.diffusion.noise import GaussianLayer
-from torch_pharma.models.diffusion.config import DGTDiffusionConfig
+from torch_pharma.config.model.nextmol.config import DGTDiffusionConfig
 
 __all__ = ["DGTDiffusion", "DGTDiffusionConfig", "TransLayer", "TransLayerOptim"]
 
