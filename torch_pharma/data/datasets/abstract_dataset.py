@@ -3,13 +3,13 @@ from typing import Optional
 import torch
 from torch.utils.data import Subset
 
-from torch_pharma.data.adaptive_loader import AdaptiveLightningDataset
+from torch_pharma.data.loaders.adaptive_loader import AdaptiveLightningDataset
 
 try:
     from torch_geometric.data import LightningDataset
 except ImportError:
     from torch_geometric.data.lightning import LightningDataset
-from torch_pharma.data.distributions import DistributionNodes
+from torch_pharma.data.utils.distributions import DistributionNodes
 
 
 def maybe_subset(

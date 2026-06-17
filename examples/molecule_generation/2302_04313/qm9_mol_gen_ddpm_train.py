@@ -31,7 +31,6 @@ print("rdkit imported", flush=True)
 from torch_geometric.data import Batch
 print("torch_geometric imported", flush=True)
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
-from omegaconf import DictConfig
 from torch_scatter import scatter
 print("torch_scatter imported", flush=True)
 

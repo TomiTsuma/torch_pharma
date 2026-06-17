@@ -45,7 +45,7 @@ def cleanup_file(file, cleanup=True):
             pass
 
 
-class QM9Dataset(BaseDataset):
+class RawQM9Dataset(BaseDataset):
     def __init__(self, calculate_thermo=True):
         super().__init__()
         self.gdb9_dir = os.path.join(TORCH_PHARMA_HOME, "QM9")
@@ -286,3 +286,26 @@ class QM9Dataset(BaseDataset):
 
     def __getitem__(self, idx):
         return self.mols_smiles[idx]
+
+
+class QM9DatasetFactory:
+    @staticmethod
+    def get_dataset(dataset_type="pyg", **kwargs):
+        """
+        Factory method to resolve and instantiate the requested QM9 dataset variant.
+        
+        Parameters:
+            dataset_type (str): Either "pyg" (or "graph") for PyTorch Geometric representation, 
+                                or "raw" (or "smiles") for the raw numpy-based representation.
+        """
+        if dataset_type in ("pyg", "graph"):
+            from torch_pharma.data.components.qm9.qm9_dataset import QM9
+            return QM9(**kwargs)
+        elif dataset_type in ("raw", "smiles"):
+            return RawQM9Dataset(**kwargs)
+        else:
+            raise ValueError(f"Unknown dataset type: {dataset_type}")
+
+
+# Alias for legacy compatibility
+QM9Dataset = RawQM9Dataset

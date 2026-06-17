@@ -16,11 +16,200 @@ from torch_pharma.data.utils import (
     train_subset,
 )
 from os.path import join
-
+from torch_pharma.constants.atom_encoder import full_atom_encoder
 from rdkit import Chem, RDLogger
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from tqdm import tqdm
 from torch_geometric.data import DataLoader
+import os
+import os.path as osp
+import re
+from typing import Callable, List, Optional
+
+import numpy as np
+import random
+import torch
+import torch.nn.functional as F
+from torch_geometric.data.makedirs import makedirs
+from tqdm import tqdm
+import copy
+from functools import lru_cache
+from rdkit import Chem
+import selfies as sf
+from data_provider.mol_mapping_utils import build_rdkit2cano_smiles_withoutH_mapping, get_smiles2selfies_mapping, invalid_int, build_rdkit2rand_smiles_withoutH_mapping
+from data_provider.conf_gen_cal_metrics import get_best_rmsd, set_rdmol_positions
+
+from torch_geometric.data import (
+    Data,
+    InMemoryDataset,
+    download_url,
+    extract_zip,
+)
+from data_provider.conf_gen_cal_metrics import my_single_process_data, generate_conformers
+from evaluation.jodo.bond_analyze import allowed_bonds
+from rdkit.Chem.rdchem import BondType as BT
+from torch_geometric.datasets import QM9
+from openbabel import openbabel, pybel
+from evaluation.eval_functions import check_3D_stability
+
+from torch_pharma.path import TORCH_PHARMA_HOME
+
+def my_add_hs(mol):
+    mol = copy.deepcopy(mol)
+    mol = Chem.RemoveHs(mol)
+    if Chem.GetFormalCharge(mol) == 0:
+        mol = Chem.AddHs(mol)
+    else:
+        add_hs = []
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() == "H":
+                continue
+            if atom.GetFormalCharge() == 0:
+                add_hs.append(atom.GetIdx())
+            elif atom.GetFormalCharge() > 0 and atom.GetTotalValence() == atom.GetExplicitValence() and atom.GetTotalValence() < allowed_bonds[atom.GetSymbol()]:
+                add_hs.append(atom.GetIdx())
+        if add_hs:
+            mol = Chem.AddHs(mol, onlyOnAtoms=add_hs, explicitOnly=False)
+    Chem.SanitizeMol(mol)
+    return mol
+
+
+def my_add_hs_old(mol, debug=False, additional_fix=False):
+    mol = copy.deepcopy(mol)
+    mol = Chem.RemoveHs(mol)
+    add_hs = []
+    for atom in mol.GetAtoms():
+        if Chem.GetFormalCharge(mol) == 0:
+            if atom.GetImplicitValence() != 0 and False:
+                add_hs.append(atom.GetIdx())
+                print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'ring')
+                # if atom.IsInRing():
+                #     add_hs.append(atom.GetIdx())
+                #     print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'ring')
+                # else:
+                #     print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'not ring')
+            else:
+                if atom.GetSymbol() == 'C' and atom.GetDegree() == 3 and atom.GetImplicitValence() > 0:
+                    if debug:
+                        print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'stable C')
+                    neis = {n.GetSymbol() for n in atom.GetNeighbors()}
+                    if neis == {'C'}:
+                        add_hs.append(atom.GetIdx())
+                        # print('add CC')
+                    continue
+                elif atom.GetSymbol() == 'N' and atom.GetDegree() == 2 and atom.GetImplicitValence() > 0:
+                    if debug:
+                        print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'stable N')
+                    continue
+                add_hs.append(atom.GetIdx())
+                if debug:
+                    print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'stable 0')
+                neis = {n.GetSymbol() for n in atom.GetNeighbors()}
+                if debug:
+                    print(neis)
+
+        elif (atom.GetTotalValence() - atom.GetExplicitValence() == 0) and atom.GetFormalCharge() == 0:
+            add_hs.append(atom.GetIdx())
+            if debug:
+                print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'implicit')
+            neis = {n.GetSymbol() for n in atom.GetNeighbors()}
+            # print(neis)
+        elif atom.GetFormalCharge() < 0:
+            add_hs.append(atom.GetIdx())
+            if debug:
+                print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetDegree(), 'charge')
+        elif atom.GetFormalCharge() > 0 and atom.GetTotalValence() == atom.GetExplicitValence() and atom.GetTotalValence() < allowed_bonds[atom.GetSymbol()]:
+            add_hs.append(atom.GetIdx())
+            if debug:
+                print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'valency')
+        else:
+            # pass
+            if debug:
+                print(atom.GetSymbol(), atom.GetFormalCharge(), atom.GetTotalValence(), atom.GetExplicitValence(), atom.GetImplicitValence(), atom.GetNoImplicit(), atom.IsInRing(), atom.GetChiralTag(), atom.GetIsAromatic(), atom.GetHybridization(), atom.GetDegree(), 'nothing')
+
+    if debug:
+        print('add_hs', add_hs)
+    if len(add_hs) > 0:
+        mol = Chem.AddHs(mol, onlyOnAtoms=add_hs, explicitOnly=False)
+
+    if additional_fix:
+        if not check_3d_stable(mol)[0]:
+            Chem.SanitizeMol(mol)
+            # mol = Chem.AddHs(mol)
+            add_hs = []
+            for atom in mol.GetAtoms():
+                if atom.GetFormalCharge() != 0 and atom.GetTotalValence() == atom.GetExplicitValence() and atom.GetTotalValence() < allowed_bonds[atom.GetSymbol()]:
+                    add_hs.append(atom.GetIdx())
+            if len(add_hs) > 0:
+                mol = Chem.AddHs(mol, onlyOnAtoms=add_hs, explicitOnly=False)
+
+    return mol
+
+HAR2EV = 27.211386246
+KCALMOL2EV = 0.04336414
+
+conversion = torch.tensor([
+    1., 1., HAR2EV, HAR2EV, HAR2EV, 1., HAR2EV, HAR2EV, HAR2EV, HAR2EV, HAR2EV,
+    1., KCALMOL2EV, KCALMOL2EV, KCALMOL2EV, KCALMOL2EV, 1., 1., 1.
+])
+
+atomrefs = {
+    6: [0., 0., 0., 0., 0.],
+    7: [
+        -13.61312172, -1029.86312267, -1485.30251237, -2042.61123593,
+        -2713.48485589
+    ],
+    8: [
+        -13.5745904, -1029.82456413, -1485.26398105, -2042.5727046,
+        -2713.44632457
+    ],
+    9: [
+        -13.54887564, -1029.79887659, -1485.2382935, -2042.54701705,
+        -2713.42063702
+    ],
+    10: [
+        -13.90303183, -1030.25891228, -1485.71166277, -2043.01812778,
+        -2713.88796536
+    ],
+    11: [0., 0., 0., 0., 0.],
+}
+
+Cv_atomref = [2.981, 2.981, 2.981, 2.981, 2.981]
+
+
+def files_exist(files: List[str]) -> bool:
+    # NOTE: We return `False` in case `files` is empty, leading to a
+    # re-processing of files on every instantiation.
+    return len(files) != 0 and all([osp.exists(f) for f in files])
+
+
+def check_3d_stable(mol):
+    bonds = {BT.SINGLE: 1, BT.DOUBLE: 2, BT.TRIPLE: 3, BT.AROMATIC: 1.5}  # 0 -> without edge
+    nr_bonds = [0 for _ in range(mol.GetNumAtoms())]
+    for bond in mol.GetBonds():
+        nr_bonds[bond.GetBeginAtomIdx()] += bonds[bond.GetBondType()]
+        nr_bonds[bond.GetEndAtomIdx()] += bonds[bond.GetBondType()]
+    correct = 0
+    for a in mol.GetAtoms():
+        if nr_bonds[a.GetIdx()] == (allowed_bonds[a.GetSymbol()] + a.GetFormalCharge()):
+            correct += 1
+        else:
+            pass
+    return correct == mol.GetNumAtoms(), nr_bonds
+
+
+def construct_mol(atoms, coordinates, title=None):
+    mol = openbabel.OBMol()
+    for atom, (x, y, z) in zip(atoms, coordinates):
+        ob_atom = mol.NewAtom()
+        ob_atom.SetAtomicNum(atom)
+        ob_atom.SetVector(x, y, z)
+    mol.ConnectTheDots()
+    mol.PerceiveBondOrders()
+    if title:
+        mol.SetTitle(title)
+    return mol
+
 
 
 def files_exist(files) -> bool:
@@ -36,43 +225,23 @@ def to_list(value: Any) -> Sequence:
         return [value]
 
 
-full_atom_encoder = {
-    "H": 0,
-    "B": 1,
-    "C": 2,
-    "N": 3,
-    "O": 4,
-    "F": 5,
-    "Al": 6,
-    "Si": 7,
-    "P": 8,
-    "S": 9,
-    "Cl": 10,
-    "As": 11,
-    "Br": 12,
-    "I": 13,
-    "Hg": 14,
-    "Bi": 15,
-}
 
-
-class QM9Dataset(InMemoryDataset):
-    raw_url = (
-        "https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/"
-        "molnet_publish/qm9.zip"
-    )
+class QM9(InMemoryDataset):
+    raw_url =  "https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/molnet_publish/qm9.zip"
     raw_url2 = "https://ndownloader.figshare.com/files/3195404"
     processed_url = "https://data.pyg.org/datasets/qm9_v3.zip"
 
     def __init__(
         self,
-        split,
-        root,
-        remove_h: bool,
+        split: str = "train",
+        root: str = os.path.join(TORCH_PHARMA_HOME, "QM9"),
+        remove_h: bool = False,
         transform=None,
         pre_transform=None,
         pre_filter=None,
-        only_stats=False
+        only_stats=False,
+        calculate_thermo: bool = True,
+        **kwargs
     ):
         self.split = split
         if self.split == "train":
@@ -276,11 +445,11 @@ class QM9DataModule(AbstractDataModule):
         self.datadir = cfg.dataset_root
         root_path = self.datadir
 
-        train_dataset = QM9Dataset(
+        train_dataset = QM9(
             split="train", root=root_path, remove_h=cfg.remove_hs, only_stats=only_stats
         )
-        val_dataset = QM9Dataset(split="val", root=root_path, remove_h=cfg.remove_hs, only_stats=only_stats)
-        test_dataset = QM9Dataset(split="test", root=root_path, remove_h=cfg.remove_hs, only_stats=only_stats)
+        val_dataset = QM9(split="val", root=root_path, remove_h=cfg.remove_hs, only_stats=only_stats)
+        test_dataset = QM9(split="test", root=root_path, remove_h=cfg.remove_hs, only_stats=only_stats)
 
         self.statistics = {
             "train": train_dataset.statistics,
