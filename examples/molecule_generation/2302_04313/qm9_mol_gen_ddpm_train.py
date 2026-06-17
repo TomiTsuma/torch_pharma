@@ -100,7 +100,7 @@ from torch_pharma.utils.tracking.loggers import WandbActivationLogger, MlflowAct
                 ),
                 MlflowActivationLogger(
                     prefix="QM9MoleculeGenerationDDPM", 
-                    tracking_uri="http://localhost:5000", # Route data to explicit loc
+                    tracking_uri="http://100.101.70.112:5000", # Route data to explicit loc
                     experiment_name="torch-pharma-QM9MoleculeGenerationDDPM", 
                     run_name="demo-run"
                 )
@@ -1392,6 +1392,18 @@ if __name__ == "__main__":
     from torch_geometric.data import Data, Batch
     from omegaconf import OmegaConf
     from torch_pharma.data.datasets.utils import TORCH_PHARMA_HOME
+    from tqdm import tqdm
+    import time
+
+    # ------------------------------------------------------------------ #
+    # Device setup — resolve device FIRST so self.device in __init__ is   #
+    # already correct when on_train_start() is called during construction. #
+    # ------------------------------------------------------------------ #
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    if device.type == "cuda":
+        print(f"  GPU: {torch.cuda.get_device_name(0)}")
+        print(f"  VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     # initialization
     def optimizer_fn(params): return AdamW(params, lr=1e-4)
@@ -1401,8 +1413,8 @@ if __name__ == "__main__":
     print("Initializing dataloaders...")
     dataloader_cfg = OmegaConf.create({
         "dataset": "QM9",
-        "batch_size": 2, # small batch size for quick test
-        "num_workers": 0,
+        "batch_size": 64,   # increased from 2 — small batches severely underutilise the GPU
+        "num_workers": 4,   # parallel data loading to keep GPU fed
         "filter_n_atoms": None,
         "data_dir": str(TORCH_PHARMA_HOME),
         "subtract_thermo": True,
@@ -1410,12 +1422,14 @@ if __name__ == "__main__":
         "remove_h": True,
         "create_pyg_graphs": True,
         "num_radials": 1,
-        "device": "cpu",
+        "device": "cuda",
         "include_charges": True
     })
     dataloaders, charge_scale = retrieve_dataloaders(dataloader_cfg)
 
     print("Initializing model...")
+    # NOTE: model is moved to `device` BEFORE the training loop so that
+    # self.device (set in __init__) and the actual parameter location agree.
     model = QM9MoleculeGenerationDDPM(
         optimizer=optimizer_fn,
         scheduler=scheduler_fn,
@@ -1423,49 +1437,85 @@ if __name__ == "__main__":
         remove_h=True,
         dataloaders=dataloaders
     )
-    model.to("cuda")
+    model = model.to(device)   # move all parameters & buffers to GPU
 
-    # run a training step
-    print("Running training step with real data...")
-    # dataset_iter = iter(dataloaders["train"])
-    # batch = next(dataset_iter).to(model.device)
-    
-    # model.train()
-    # try:
-    #     metrics = model.training_step(batch, 0)
-    #     print(f"Training metrics: {metrics}")
-    # except Exception as e:
-    #     print(f"Training step failed: {e}")
-    #     import traceback
-    #     traceback.print_exc()
+    # ------------------------------------------------------------------ #
+    # Instantiate optimizer + scheduler via configure_optimizers().        #
+    # Previously the optimizer callable was stored but never called, so    #
+    # weight updates never happened and the GPU did no useful work.        #
+    # ------------------------------------------------------------------ #
+    opt_cfg = model.configure_optimizers()
+    optimizer = opt_cfg["optimizer"]
+    lr_scheduler = opt_cfg.get("lr_scheduler", {}).get("scheduler", None)
 
-    # # run a validation step
-    # print("Running validation step with real data...")
-    # val_batch = next(iter(dataloaders["valid"])).to(model.device)
-    # model.eval()
-    # try:
-    #     metrics = model.validation_step(val_batch, 0)
-    #     print(f"Validation metrics: {metrics}")
-    # except Exception as e:
-    #     print(f"Validation step failed: {e}")
-    #     import traceback
-    #     traceback.print_exc()
-    from tqdm import tqdm
+    # Mixed-precision grad scaler (safe no-op on CPU)
+    scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda"))
+
+    print("Starting training loop...")
     for epoch in range(100):
+        # -------- train ------------------------------------------------ #
+        model.train()
+        epoch_start = time.time()
+        print(f"\nEpoch {epoch + 1} training start...")
+        for batch_idx, batch in enumerate(tqdm(dataloaders['train'])):
+            batch = batch.to(device)
 
-        print(f"Epoch {epoch+1} training start...")
-        for batch in tqdm(dataloaders['train']):
-            batch = batch.to(model.device)
-            metrics = model.training_step(batch, 0)
-            print(f"Training metrics: {metrics}")
+            optimizer.zero_grad(set_to_none=True)  # faster than zero_grad()
 
-        print(f"Epoch {epoch+1} validation start...")
-        for batch in tqdm(dataloaders['valid']):
-            batch = batch.to(model.device)
-            metrics = model.validation_step(batch, 0)
-            print(f"Validation metrics: {metrics}")
+            # Forward pass under autocast for mixed precision
+            with torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
+                metrics = model.training_step(batch, batch_idx)
+                if metrics is None:              # OOM skip
+                    print("Skipping due to OOM error")
+                    continue
+                loss = metrics["loss"]
 
-        torch.save(model.state_dict(), f"examples/molecule_generation/2302_04313/checkpoints/model_{epoch}.pt")
+            # ---- THIS WAS THE MAIN MISSING PIECE ---------------------- #
+            # Without scaler.scale(loss).backward() the GPU never          #
+            # computed gradients, so nvidia-smi showed 0% utilisation.     #
+            scaler.scale(loss).backward()        # compute gradients on GPU
+            # ----------------------------------------------------------- #
+
+            # Optional gradient clipping (uses the adaptive queue inside model)
+            scaler.unscale_(optimizer)
+            model.configure_gradient_clipping(optimizer)
+
+            scaler.step(optimizer)               # update weights
+            scaler.update()
+
+            if batch_idx % 50 == 0 and device.type == "cuda":
+                alloc = torch.cuda.memory_allocated(device) / 1e9
+                reserv = torch.cuda.memory_reserved(device) / 1e9
+                print(f"  [step {batch_idx}] loss={loss.item():.4f}  "
+                      f"VRAM alloc={alloc:.2f}GB / reserved={reserv:.2f}GB")
+
+        model.on_train_epoch_end()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
+
+        # -------- validate --------------------------------------------- #
+        model.eval()
+        print(f"Epoch {epoch + 1} validation start...")
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(tqdm(dataloaders['valid'])):
+                batch = batch.to(device)
+                with torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
+                    metrics = model.validation_step(batch, batch_idx)
+
+        model.on_validation_epoch_end()
+        model.current_epoch += 1
+
+        epoch_time = time.time() - epoch_start
+        print(f"Epoch {epoch + 1} done in {epoch_time:.1f}s")
+
+        # checkpoint
+        ckpt_path = f"examples/molecule_generation/2302_04313/checkpoints/model_{epoch}.pt"
+        torch.save({
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }, ckpt_path)
+        print(f"Checkpoint saved to {ckpt_path}")
 
     # run sampling
     print("Running sampling...")
@@ -1477,5 +1527,4 @@ if __name__ == "__main__":
         print(f"Sampling failed: {e}")
         import traceback
         traceback.print_exc()
-
-            
+    

@@ -176,10 +176,10 @@ def localize(
         edge_mask = node_mask[row] & node_mask[col]
 
         x_diff = torch.ones((edge_index.shape[1], 3), device=edge_index.device) * torch.inf
-        x_diff[edge_mask] = x[row][edge_mask] - x[col][edge_mask]
+        x_diff[edge_mask] = (x[row][edge_mask] - x[col][edge_mask]).to(x_diff.dtype)
 
         x_cross = torch.ones((edge_index.shape[1], 3), device=edge_index.device) * torch.inf
-        x_cross[edge_mask] = torch.cross(x[row][edge_mask], x[col][edge_mask])
+        x_cross[edge_mask] = torch.cross(x[row][edge_mask], x[col][edge_mask]).to(x_cross.dtype)
     else:
         x_diff = x[row] - x[col]
         x_cross = torch.cross(x[row], x[col])
@@ -189,7 +189,7 @@ def localize(
             norm = torch.ones((edge_index.shape[1], 1), device=x_diff.device)
             norm[edge_mask] = (
                 torch.sqrt(torch.sum((x_diff[edge_mask] ** 2), dim=1).unsqueeze(1))
-            ) + 1
+            ).to(norm.dtype) + 1
         else:
             norm = torch.sqrt(torch.sum((x_diff) ** 2, dim=1).unsqueeze(1)) + 1
         x_diff = x_diff / norm
@@ -198,14 +198,14 @@ def localize(
             cross_norm = torch.ones((edge_index.shape[1], 1), device=x_cross.device)
             cross_norm[edge_mask] = (
                 torch.sqrt(torch.sum((x_cross[edge_mask]) ** 2, dim=1).unsqueeze(1))
-            ) + 1
+            ).to(cross_norm.dtype) + 1
         else:
             cross_norm = (torch.sqrt(torch.sum((x_cross) ** 2, dim=1).unsqueeze(1))) + 1
         x_cross = x_cross / cross_norm
 
     if node_mask is not None:
         x_vertical = torch.ones((edge_index.shape[1], 3), device=edge_index.device) * torch.inf
-        x_vertical[edge_mask] = torch.cross(x_diff[edge_mask], x_cross[edge_mask])
+        x_vertical[edge_mask] = torch.cross(x_diff[edge_mask], x_cross[edge_mask]).to(x_vertical.dtype)
     else:
         x_vertical = torch.cross(x_diff, x_cross)
 
@@ -236,7 +236,7 @@ def scalarize(
         local_scalar_rep_i = torch.zeros((edge_index.shape[1], 3, 3), device=edge_index.device)
         local_scalar_rep_i[edge_mask] = torch.matmul(
             frames[edge_mask], vector_rep_i[edge_mask]
-        )
+        ).to(local_scalar_rep_i.dtype)
         local_scalar_rep_i = local_scalar_rep_i.transpose(-1, -2)
     else:
         local_scalar_rep_i = torch.matmul(frames, vector_rep_i).transpose(-1, -2)
@@ -282,7 +282,7 @@ def vectorize(
                 gate[edge_mask, i:i + 1] * x_diff[edge_mask]
                 + gate[edge_mask, i + 1:i + 2] * x_cross[edge_mask]
                 + gate[edge_mask, i + 2:i + 3] * x_vertical[edge_mask]
-            )
+            ).to(gate_vector.dtype)
         else:
             gate_vector[:, i:i + 3] = (
                 gate[:, i:i + 1] * x_diff

@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple, Dict, Tensor
+from typing import Optional, Tuple, Dict
+from torchtyping import TensorType
+from torch import Tensor
 from torch_scatter import scatter_mean, scatter_add
 import numpy as np
 

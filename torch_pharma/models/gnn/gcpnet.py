@@ -19,7 +19,7 @@ from torch_pharma.features import (
 from omegaconf import OmegaConf, DictConfig
 from copy import copy
 from functools import partial
-from torch_pharma.models.layer import GCPLayerNorm
+from torch_pharma.models.normalization.normalizer import GCPLayerNorm
 from torch_pharma.models.dropout import GCPDropout
 from torch_pharma.models.dynamics.utils import NODE_FEATURE_DIFFUSION_TARGETS
 from torch_pharma.data.components.edm.edm_dataset import _edge_features, _node_features
