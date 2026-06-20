@@ -1,0 +1,75 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting selfies
+  Using cached selfies-2.2.0-py3-none-any.whl.metadata (14 kB)
+Requirement already satisfied: transformers in /home/rhadamanthys/.local/lib/python3.11/site-packages (4.57.1)
+Collecting peft
+  Using cached peft-0.19.1-py3-none-any.whl.metadata (15 kB)
+Collecting accelerate
+  Using cached accelerate-1.14.0-py3-none-any.whl.metadata (19 kB)
+Requirement already satisfied: scipy in /home/rhadamanthys/.local/lib/python3.11/site-packages (1.15.3)
+Requirement already satisfied: nltk in /home/rhadamanthys/.local/lib/python3.11/site-packages (3.9.4)
+Collecting rouge-score
+  Downloading rouge_score-0.1.2.tar.gz (17 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: filelock in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (3.20.0)
+Requirement already satisfied: huggingface-hub<1.0,>=0.34.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (0.36.2)
+Requirement already satisfied: numpy>=1.17 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (2.4.4)
+Requirement already satisfied: packaging>=20.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (26.0)
+Requirement already satisfied: pyyaml>=5.1 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (6.0.1)
+Requirement already satisfied: regex!=2019.12.17 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (2025.11.3)
+Requirement already satisfied: requests in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (2.32.5)
+Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (0.22.1)
+Requirement already satisfied: safetensors>=0.4.3 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (0.6.2)
+Requirement already satisfied: tqdm>=4.27 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from transformers) (4.67.1)
+Requirement already satisfied: fsspec>=2023.5.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (2024.3.1)
+Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (1.2.0)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers) (4.15.0)
+Requirement already satisfied: psutil in /home/rhadamanthys/.local/lib/python3.11/site-packages (from peft) (7.1.3)
+Requirement already satisfied: torch>=1.13.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from peft) (2.9.0)
+Requirement already satisfied: click in /usr/local/lib/python3.11/dist-packages (from nltk) (8.3.1)
+Requirement already satisfied: joblib in /home/rhadamanthys/.local/lib/python3.11/site-packages (from nltk) (1.5.2)
+Requirement already satisfied: absl-py in /home/rhadamanthys/.local/lib/python3.11/site-packages (from rouge-score) (2.3.1)
+Requirement already satisfied: six>=1.14.0 in /usr/local/lib/python3.11/dist-packages (from rouge-score) (1.17.0)
+Requirement already satisfied: sympy>=1.13.3 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (1.14.0)
+Requirement already satisfied: networkx>=2.5.1 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (3.5)
+Requirement already satisfied: jinja2 in /usr/local/lib/python3.11/dist-packages (from torch>=1.13.0->peft) (3.1.6)
+Requirement already satisfied: nvidia-cuda-nvrtc-cu12==12.8.93 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.93)
+Requirement already satisfied: nvidia-cuda-runtime-cu12==12.8.90 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.90)
+Requirement already satisfied: nvidia-cuda-cupti-cu12==12.8.90 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.90)
+Requirement already satisfied: nvidia-cudnn-cu12==9.10.2.21 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (9.10.2.21)
+Requirement already satisfied: nvidia-cublas-cu12==12.8.4.1 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.4.1)
+Requirement already satisfied: nvidia-cufft-cu12==11.3.3.83 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (11.3.3.83)
+Requirement already satisfied: nvidia-curand-cu12==10.3.9.90 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (10.3.9.90)
+Requirement already satisfied: nvidia-cusolver-cu12==11.7.3.90 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (11.7.3.90)
+Requirement already satisfied: nvidia-cusparse-cu12==12.5.8.93 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.5.8.93)
+Requirement already satisfied: nvidia-cusparselt-cu12==0.7.1 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (0.7.1)
+Requirement already satisfied: nvidia-nccl-cu12==2.27.5 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (2.27.5)
+Requirement already satisfied: nvidia-nvshmem-cu12==3.3.20 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (3.3.20)
+Requirement already satisfied: nvidia-nvtx-cu12==12.8.90 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.90)
+Requirement already satisfied: nvidia-nvjitlink-cu12==12.8.93 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (12.8.93)
+Requirement already satisfied: nvidia-cufile-cu12==1.13.1.3 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (1.13.1.3)
+Requirement already satisfied: triton==3.5.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from torch>=1.13.0->peft) (3.5.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from sympy>=1.13.3->torch>=1.13.0->peft) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in /usr/local/lib/python3.11/dist-packages (from jinja2->torch>=1.13.0->peft) (3.0.3)
+Requirement already satisfied: charset_normalizer<4,>=2 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from requests->transformers) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from requests->transformers) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in /home/rhadamanthys/.local/lib/python3.11/site-packages (from requests->transformers) (2.0.7)
+Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.11/dist-packages (from requests->transformers) (2025.11.12)
+Downloading selfies-2.2.0-py3-none-any.whl (36 kB)
+Downloading peft-0.19.1-py3-none-any.whl (680 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 680.7/680.7 kB 1.5 MB/s  0:00:00
+Downloading accelerate-1.14.0-py3-none-any.whl (389 kB)
+Building wheels for collected packages: rouge-score
+  Building wheel for rouge-score (pyproject.toml): started
+  Building wheel for rouge-score (pyproject.toml): finished with status 'done'
+  Created wheel for rouge-score: filename=rouge_score-0.1.2-py3-none-any.whl size=24988 sha256=87a6fe14534637ccecfd97b8d0e4519adb2a747c9c372b0e6eda77bf8c074047
+  Stored in directory: /home/rhadamanthys/.cache/pip/wheels/1e/19/43/8a442dc83660ca25e163e1bd1f89919284ab0d0c1475475148
+Successfully built rouge-score
+Installing collected packages: selfies, rouge-score, accelerate, peft
+
+Successfully installed accelerate-1.14.0 peft-0.19.1 rouge-score-0.1.2 selfies-2.2.0

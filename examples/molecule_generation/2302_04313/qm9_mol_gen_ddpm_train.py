@@ -81,6 +81,10 @@ patch_typeguard()  # use before @typechecked
 from torch_pharma.utils.tracking import track_gnn_activations
 from torch_pharma.utils.tracking.loggers import WandbActivationLogger, MlflowActivationLogger
 
+import mlflow
+mlflow.set_tracking_uri("http://localhost:5000")
+
+
 
 
 
@@ -100,7 +104,7 @@ from torch_pharma.utils.tracking.loggers import WandbActivationLogger, MlflowAct
                 ),
                 MlflowActivationLogger(
                     prefix="QM9MoleculeGenerationDDPM", 
-                    tracking_uri="http://100.101.70.112:5000", # Route data to explicit loc
+                    tracking_uri="http://localhost:5000", # Route data to explicit loc
                     experiment_name="torch-pharma-QM9MoleculeGenerationDDPM", 
                     run_name="demo-run"
                 )
@@ -433,6 +437,7 @@ class QM9MoleculeGenerationDDPM(nn.Module):
         # calculate standard NLL from forward KL-divergence while preserving its gradients
         metrics_dict["loss"] = nll.mean(0)
 
+        mlflow.log_metrics(metrics_dict, step=self.global_step)
         # update metrics
         for metric in self.metrics_to_monitor:
             # e.g., averaging loss across batches
@@ -1463,25 +1468,29 @@ if __name__ == "__main__":
             optimizer.zero_grad(set_to_none=True)  # faster than zero_grad()
 
             # Forward pass under autocast for mixed precision
-            with torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
-                metrics = model.training_step(batch, batch_idx)
-                if metrics is None:              # OOM skip
-                    print("Skipping due to OOM error")
-                    continue
-                loss = metrics["loss"]
-
+            # with torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
+            metrics = model.training_step(batch, batch_idx)
+            if metrics is None:              # OOM skip
+                print("Skipping due to OOM error")
+                continue
+            loss = metrics["loss"]
+            
+            print(loss)
+            print(loss.requires_grad)
+            print(loss.grad_fn)
             # ---- THIS WAS THE MAIN MISSING PIECE ---------------------- #
             # Without scaler.scale(loss).backward() the GPU never          #
             # computed gradients, so nvidia-smi showed 0% utilisation.     #
-            scaler.scale(loss).backward()        # compute gradients on GPU
+            # scaler.scale(loss).backward()        # compute gradients on GPU
             # ----------------------------------------------------------- #
 
             # Optional gradient clipping (uses the adaptive queue inside model)
-            scaler.unscale_(optimizer)
+            # scaler.unscale_(optimizer)
+            loss.backward()
             model.configure_gradient_clipping(optimizer)
 
-            scaler.step(optimizer)               # update weights
-            scaler.update()
+            # scaler.step(optimizer)               # update weights
+            # scaler.update()
 
             if batch_idx % 50 == 0 and device.type == "cuda":
                 alloc = torch.cuda.memory_allocated(device) / 1e9
