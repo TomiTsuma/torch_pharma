@@ -38,7 +38,8 @@ dependencies = [
     "gdown",
     "imageio",
     "wandb",
-    "mlflow"
+    "mlflow",
+    "peft"
 ]
 
 [project.optional-dependencies]

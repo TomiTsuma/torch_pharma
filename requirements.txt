@@ -16,3 +16,4 @@ flake8
 mkdocs
 mkdocs-material
 gdown
+peft
