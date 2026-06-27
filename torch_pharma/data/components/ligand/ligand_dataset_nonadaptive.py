@@ -16,7 +16,7 @@ from torch_pharma.data.utils import (
     save_pickle,
     write_xyz_file,
 )
-from torch_pharma.constants.atom_encoder import full_atom_encoder
+from torch_pharma.constants.atom import full_atom_encoder
 
 
 

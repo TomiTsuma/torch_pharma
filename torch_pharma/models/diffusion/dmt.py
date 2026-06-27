@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from torch_pharma.models.dynamics.equivariance import EquivariantBlock
 from torch_pharma.models.dynamics.projector import ExtendedProjector
-from torch_pharma.models.embedding.learned_sinusoidal_pos_embedding import LearnedSinusodialposEmb
+from torch_pharma.models.embedding.sinusoidal_pos_embedding import LearnedSinusodialposEmb
 from torch_pharma.models.message_passing.update_layer import ConditionalEquivariantUpdate
 from torch_pharma.models.message_passing.transformation_layer import (
     TransformLayer as TransLayer,

@@ -10,7 +10,9 @@ from torch_sparse import SparseTensor
 from torch_scatter import scatter
 from torch_scatter.composite import scatter_softmax
 from torch_geometric.nn import knn_graph
+from torch_scatter import scatter_sum
 
+from torch_pharma.models.mlp import MLP
 from torch_pharma.models.diffusion.e3_molecular_diffusion.modules import DenseLayer, GatedEquivBlock, SE3Norm
 
 
@@ -805,3 +807,90 @@ class TopoEdgeConvLayer(MessagePassing):
         msg, e = self.msg_mlp(msg).split([self.in_dim, self.edge_dim], dim=-1)
         x_j = msg * xu_j
         return x_j, e
+
+
+
+
+class GINEConv(nn.Module):
+    r"""The modified :class:`GINConv` operator from the `"Strategies for
+    Pre-training Graph Neural Networks" <https://arxiv.org/abs/1905.12265>`_
+    paper.
+
+    .. math::
+        \mathbf{x}^{\prime}_i = h_{\mathbf{\Theta}} \left( (1 + \epsilon) \cdot
+        \mathbf{x}_i + \sum_{j \in \mathcal{N}(i)} \mathrm{ReLU}
+        ( \mathbf{x}_j + \mathbf{e}_{j,i} ) \right)
+
+    that is able to incorporate edge features :math:`\mathbf{e}_{j,i}` into
+    the aggregation procedure.
+
+    Args:
+        input_size: dimension of the input size
+        hidden_size: dimension of the hidden variable
+        eps (float, optional): (Initial) :math:`\epsilon`-value.
+            (default: :obj:`0.`)
+        train_eps (bool, optional): If set to :obj:`True`, :math:`\epsilon`
+            will be a trainable parameter. (default: :obj:`False`)
+        edge_size (int, optional): Edge feature dimensionality. If set to
+            :obj:`None`, node and edge feature dimensionality is expected to
+            match. Other-wise, edge features are linearly transformed to match
+            node feature dimensionality. (default: :obj:`None`)
+        **kwargs (optional): Additional arguments of
+            :class:`torch_geometric.nn.conv.MessagePassing`.
+
+    Shapes:
+        - **input:**
+          node features :math:`(|\mathcal{V}|, F_{in})` or
+          :math:`((|\mathcal{V_s}|, F_{s}), (|\mathcal{V_t}|, F_{t}))`
+          if bipartite,
+          edge indices :math:`(2, |\mathcal{E}|)`,
+          edge features :math:`(|\mathcal{E}|, D)` *(optional)*
+        - **output:** node features :math:`(|\mathcal{V}|, F_{out})` or
+          :math:`(|\mathcal{V}_t|, F_{out})` if bipartite
+    """
+    
+    def __init__(self, input_size, hidden_size, out_size, edge_size, n_layers: int=3, eps: float=0):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.out_size = out_size
+        self.edge_size = edge_size
+        self.n_layers = n_layers
+        self.eps = eps
+
+        self.linear_input = nn.Linear(input_size, hidden_size)
+        self.linear_edge = nn.Linear(edge_size, hidden_size)
+        self.linear_out = nn.Linear(hidden_size, out_size)
+
+        mlps = []
+        for i in range(n_layers):
+            mlps.append(MLP(
+                hidden_size, hidden_size, hidden_size,
+                n_layers=2, act_fn=nn.ReLU(),
+                end_with_act=True
+            ))
+        self.mlps = nn.ModuleList(mlps)
+
+    def forward(self, H, E, edge_attr):
+        '''
+        Args:
+            H: [N, input_size]
+            E: [2, E] src/dst
+            edge_attr: [E, edge_size]
+        '''
+        # prepare
+        src, dst = E # message passing aggregates dst nodes to src nodes
+        H = self.linear_input(H)  # [N, hidden_size]
+        edge_attr = self.linear_edge(edge_attr) # [E, hidden_size]
+
+        for i in range(self.n_layers):
+
+            # get message
+            msg = F.relu(H[dst] + edge_attr) # [E, hidden_size]
+            aggr = scatter_sum(msg, src, dim=0, dim_size=H.shape[0]) # [N, hidden_size]
+
+            # update
+            updated = (1 + self.eps) * H + aggr
+            H = self.mlps[i](updated)
+
+        return self.linear_out(H)

@@ -17,7 +17,7 @@ from tqdm import tqdm
 from torch_pharma.data.components.ligand import utils
 from torch_pharma.constants import *
 from torch_pharma.constants.bond_parameters import covalent_radii
-from torch_pharma.constants.atom_encoder import atom_encoder
+from torch_pharma.constants.atom import atom_encoder
 from torch_pharma.constants.dataset_parameters import dataset_params
 from torch_pharma.data.components.ligand.molecule_builder import build_molecule
 

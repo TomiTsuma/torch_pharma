@@ -8,9 +8,14 @@ import functools
 import warnings
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from copy import deepcopy
  
 import torch
 import torch.nn as nn
+
+from collections import namedtuple
+from functools import wraps
 
 from .store import ActivationStore
 from .hooks import _make_forward_hook, _make_message_hook
@@ -225,3 +230,78 @@ def track_gnn_activations(
     return decorator
  
  
+
+
+_NAMESPACE = {}
+
+def register(name):
+    def decorator(cls):
+        assert name not in _NAMESPACE, f'Class {name} already registered'
+        _NAMESPACE[name] = cls
+        return cls
+    return decorator
+
+
+def get(name):
+    if name not in _NAMESPACE:
+        raise ValueError(f'Class {name} not registered')
+    return _NAMESPACE[name]
+
+
+def recur_construct(val: any):
+    if isinstance(val, dict):
+        if 'class' in val: return construct(val) # leaf node
+        for key in val:
+            val[key] = recur_construct(val[key])
+    elif isinstance(val, list):
+        val = [recur_construct(v) for v in val]
+    return val
+
+
+def construct(config: Dict, **kwargs):
+    config = deepcopy(config)
+    cls_name = config.pop('class')
+    cls = get(cls_name)
+    config.update(kwargs)
+    return cls(**config)
+
+
+
+
+
+OOMReturn = namedtuple('OOMReturn', ['fake_loss'])
+
+
+def oom_decorator(forward):
+    @wraps(forward)
+
+    def deco_func(self, *args, **kwargs):
+        try:
+            output = forward(self, *args, **kwargs)
+            return output
+        except RuntimeError as e:
+            if 'out of memory' in str(e):
+                output = sum([p.norm() for p in self.parameters() if p.dtype == torch.float]) * 0.0
+                return OOMReturn(output)
+            else:
+                raise e
+    
+    return deco_func
+
+
+def safe_backward(loss, model):
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        loss.backward() # regrettedly, we cannot handle backward oom in distributed training
+        return True
+    
+    try:
+        loss.backward()
+        return True
+    except RuntimeError as e:
+        if 'out of memory' in str(e):
+            fake_loss = sum([p.norm() for p in model.parameters() if p.dtype == torch.float]) * 0.0
+            fake_loss.backward()
+            torch.cuda.empty_cache()
+            return False
+        else:
+            raise e

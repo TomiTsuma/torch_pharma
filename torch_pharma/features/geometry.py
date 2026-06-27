@@ -5,7 +5,7 @@ from typing import Optional, Tuple, Union
 from torchtyping import TensorType, patch_typeguard
 from typeguard import typechecked
 import numpy as np
-from torch_pharma.constants.backbone_geometry import CA_C_DIST, N_CA_C_ANGLE, N_CA_DIST
+from torch_pharma.constants.geometry import CA_C_DIST, N_CA_C_ANGLE, N_CA_DIST
 
 patch_typeguard()
 

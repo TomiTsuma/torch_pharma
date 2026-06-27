@@ -12,7 +12,7 @@ from torch_pharma.data.datasets.abstract_dataset import (
 )
 from torch_pharma.data.metrics import compute_all_statistics
 from torch.utils.data import Subset
-from torch_pharma.constants.atom_encoder import full_atom_encoder
+from torch_pharma.constants.atom import full_atom_encoder
 
 
 class GeomDrugsDataset(InMemoryDataset):

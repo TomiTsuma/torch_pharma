@@ -4,6 +4,7 @@ from torch.nn import functional as F
 from torch import nn
 from torch_pharma.models.embedding.rotary_embedding import LlamaRotaryEmbedding, apply_rotary_pos_emb
 from typing import Optional
+from xformers.ops import memory_efficient_attention as attn_func
 
 class LlamaAttention(nn.Module):
     def __init__(
@@ -94,3 +95,67 @@ class LlamaAttention(nn.Module):
         attn_output = self.o_proj(attn_output)  # (B, T, D)
 
         return attn_output
+
+
+
+        
+class SelfAttnLayer(nn.Module):
+
+    def __init__(self, d_hidden, n_heads, layer_idx=-1, efficient=False, attn_bias=True):
+
+        super(SelfAttnLayer, self).__init__()
+
+        self.d_hidden = d_hidden
+        self.n_heads = n_heads
+        self.d_head = self.d_hidden // self.n_heads
+        self.layer_idx = layer_idx
+        self.factor = 0.5 / math.sqrt(self.d_head)
+        self.efficient = efficient
+        self.scaler_q = nn.Linear(d_hidden, d_hidden * 4, bias=attn_bias)
+        self.scaler_k = nn.Linear(d_hidden, d_hidden * 4, bias=attn_bias)
+        self.scaler_v = nn.Linear(d_hidden, d_hidden, bias=attn_bias)
+        self.vector_v = nn.Linear(d_hidden, d_hidden, bias = False)
+        self.scaler_o = nn.Linear(d_hidden, d_hidden)
+        self.vector_o = nn.Linear(d_hidden, d_hidden, bias = False)
+
+    def forward(self, H, V, cached_info=None):
+
+        # H : [B, N, d_hidden]
+        # V : [B, N, 3, d_hidden]
+
+        batch_size, num_nodes = H.shape[0], H.shape[1]
+
+        D_batch, rbf_feat_batch, H_mask = cached_info  
+
+        H_q = self.scaler_q(H).view(batch_size, num_nodes, self.n_heads, -1)
+        H_k = self.scaler_k(H).view(batch_size, num_nodes, self.n_heads, -1)
+        H_v = self.scaler_v(H).view(batch_size, num_nodes, self.n_heads, -1)
+        V_v = self.vector_v(V).view(batch_size, num_nodes, 3, self.n_heads, -1).transpose(-2, -3).flatten(start_dim=-2) 
+        V_attn = torch.cat([H_v, V_v], dim=-1)
+
+        bias = rbf_feat_batch[self.layer_idx] + D_batch.unsqueeze(1)
+        mask = H_mask.unsqueeze(1).unsqueeze(2)  # (B, 1, 1, N)
+        bias = bias.masked_fill(mask == 0, float("-inf"))
+
+        if not self.efficient:
+            attn = torch.einsum('bnhd, bmhd -> bhnm', H_q, H_k)
+            attn = F.softmax(attn * self.factor + bias, dim=-1)
+            res = torch.einsum('bhnm, bmhd -> bnhd', attn, V_attn)
+
+        else:
+            res = attn_func(
+                query = H_q,
+                key = H_k,
+                value = V_attn,
+                attn_bias = bias.expand(-1, self.n_heads, -1, -1)
+            )
+
+
+        H_res = res[:, :, :, :self.d_head].reshape(batch_size, num_nodes, self.d_hidden)
+        V_res = res[:, :, :, self.d_head:].reshape(batch_size, num_nodes, self.n_heads, 3, self.d_head).transpose(-2, -3).reshape(batch_size, num_nodes, 3, self.d_hidden)
+        
+        H_o = self.scaler_o(H_res) 
+        V_o = self.vector_o(V_res)
+
+        return H_o, V_o
+

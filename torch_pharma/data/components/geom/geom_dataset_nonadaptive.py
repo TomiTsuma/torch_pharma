@@ -9,7 +9,7 @@ from torch_pharma.data.datasets.abstract_dataset import (
 )
 from torch_pharma.data.components.geom.geom_dataset_adaptive import GeomDrugsDataset
 from torch_pharma.data.utils import train_subset
-from torch_pharma.constants.atom_encoder import full_atom_encoder
+from torch_pharma.constants.atom import full_atom_encoder
 
 
 class GeomDataModule(AbstractDataModule):

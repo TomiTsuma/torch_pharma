@@ -16,7 +16,7 @@ from torch_pharma.data.utils import (
     train_subset,
 )
 from os.path import join
-from torch_pharma.constants.atom_encoder import full_atom_encoder
+from torch_pharma.constants.atom import full_atom_encoder
 from rdkit import Chem, RDLogger
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from tqdm import tqdm

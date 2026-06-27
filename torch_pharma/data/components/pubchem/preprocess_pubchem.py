@@ -7,7 +7,7 @@ import pubchem.data.dataset_utils as dataset_utils
 from tqdm import tqdm
 import pickle
 import argparse
-from torch_pharma.constants.atom_encoder import full_atom_encoder
+from torch_pharma.constants.atom import full_atom_encoder
 
 
 def get_args():
